@@ -8,12 +8,13 @@ const contextPanel = document.querySelector("#context-panel");
 const searchInput = document.querySelector("#search-input");
 const searchResults = document.querySelector("#search-results");
 
+const initialMainRoute = parseRoute(window.location.pathname);
 const state = {
   model: null,
-  mainRoute: parseRoute(window.location.pathname),
+  mainRoute: initialMainRoute,
   rightRoute: null,
   expanded: {
-    main: new Set(),
+    main: expandedForRoute(initialMainRoute),
     right: new Set(),
   },
   openRelations: new Set(),
@@ -48,17 +49,21 @@ function panelState(panelName) {
   return panelName === "main" ? state.expanded.main : state.expanded.right;
 }
 
+function expandedForRoute(route) {
+  return new Set(route.kind === "fsrs" ? [`fsrs:${route.id}`] : []);
+}
+
 function openRoute(route, panelName = "main", replace = false) {
   if (route.kind === "unknown") return;
   if (panelName === "main") {
     state.mainRoute = route;
-    state.expanded.main = new Set(route.kind === "record" ? [route.id] : []);
+    state.expanded.main = expandedForRoute(route);
     state.openRelations = new Set();
     if (replace) window.history.replaceState({}, "", routePath(route));
     else window.history.pushState({}, "", routePath(route));
   } else {
     state.rightRoute = route;
-    state.expanded.right = new Set(route.kind === "record" ? [route.id] : []);
+    state.expanded.right = expandedForRoute(route);
   }
   render();
 }
@@ -70,10 +75,15 @@ function closeRight() {
 }
 
 function appendBreadcrumb(container, route, panelName) {
+  if (route.kind === "fsrs") {
+    container.append(element("span", "breadcrumb-label", "fsrs"));
+    container.append(element("span", "breadcrumb-separator", "/"));
+    container.append(element("span", "breadcrumb-label", route.id));
+    return;
+  }
   const trail = route.kind === "record" && state.model
     ? state.model.getPath(route.id)
     : [{ id: null, label: "root" }];
-  if (route.kind === "fsrs") trail.push({ id: null, label: `FSRS ${route.id}` });
   trail.forEach((part, index) => {
     if (index > 0) container.append(element("span", "breadcrumb-separator", "/"));
     const link = element("button", "breadcrumb-link", part.label);
@@ -194,7 +204,10 @@ function renderRecordNode(parent, record, panelName) {
       render();
     });
   }
-  row.append(caret);
+  const marker = element("span", "record-marker");
+  marker.append(caret);
+  renderMetaPopover(marker, record);
+  row.append(marker);
 
   const body = recordLink(record, panelName, "record-body", record.body);
   body.title = "点击 zoom；Shift-click 在右栏打开";
@@ -210,25 +223,22 @@ function renderRecordNode(parent, record, panelName) {
   const counts = element("div", "record-counts");
   const outgoing = state.model.outgoingById.get(record.id) || [];
   const incoming = state.model.incomingById.get(record.id) || [];
-  for (const [kind, ids, label] of [["outgoing", outgoing, "引用"], ["incoming", incoming, "被引用"]]) {
+  for (const [kind, ids, label] of [["outgoing", outgoing, "引用"], ["incoming", incoming, "反向链接"]]) {
+    if (!ids.length) continue;
     const button = element("button", "count-button", `${label} ${ids.length}`);
     button.type = "button";
-    button.disabled = ids.length === 0;
-    button.title = ids.length ? "展开直接记录预览" : "没有直接记录关系";
-    if (ids.length) {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const key = relationKey(panelName, record.id, kind);
-        if (state.openRelations.has(key)) state.openRelations.delete(key);
-        else state.openRelations.add(key);
-        render();
-      });
-    }
+    button.title = "展开直接记录预览";
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const key = relationKey(panelName, record.id, kind);
+      if (state.openRelations.has(key)) state.openRelations.delete(key);
+      else state.openRelations.add(key);
+      render();
+    });
     counts.append(button);
   }
   row.append(counts);
   item.append(row);
-  renderMetaPopover(item, record);
   if (expanded) {
     const list = element("div", "record-children");
     for (const child of children) renderRecordNode(list, child, panelName);
@@ -269,14 +279,16 @@ function renderRecordReferences(container, record, panelName) {
 
 function renderTreePanel(container, route, panelName) {
   const list = element("div", "outline");
+  const focusedRecord = route.kind === "record" ? state.model.recordsById.get(route.id) : null;
   const roots = route.kind === "record"
-    ? (state.model.recordsById.has(route.id) ? [state.model.recordsById.get(route.id)] : [])
+    ? (focusedRecord ? state.model.getChildren(focusedRecord.id) : [])
     : state.model.rootRecords;
   if (!roots.length) {
     const empty = element("div", "empty-state");
-    empty.append(element("span", "empty-mark", route.kind === "record" ? "?" : "∅"));
-    empty.append(element("h2", "empty-title", route.kind === "record" ? "记录不存在" : "根目录为空"));
-    empty.append(element("p", "empty-copy", route.kind === "record" ? "该记录不在当前知识库快照中。" : "当前快照没有知识记录。"));
+    const missingRecord = route.kind === "record" && !focusedRecord;
+    empty.append(element("span", "empty-mark", missingRecord ? "?" : "∅"));
+    empty.append(element("h2", "empty-title", missingRecord ? "记录不存在" : route.kind === "record" ? "没有子节点" : "根目录为空"));
+    empty.append(element("p", "empty-copy", missingRecord ? "该记录不在当前知识库快照中。" : route.kind === "record" ? "当前记录没有直接子节点。" : "当前快照没有知识记录。"));
     list.append(empty);
   } else {
     for (const record of roots) renderRecordNode(list, record, panelName);
@@ -315,18 +327,33 @@ function renderFsrsPanel(container, route, panelName) {
 
   const relationIds = state.model.recordsByFsrs.get(fsrs.id) || [];
   const linked = element("section", "fsrs-links");
-  linked.append(element("h2", "section-title", "关联知识记录"));
+  const linkedHeader = element("div", "fsrs-links-header");
+  const fsrsKey = `fsrs:${fsrs.id}`;
+  const expanded = panelState(panelName).has(fsrsKey);
+  const caret = element("button", relationIds.length ? "caret" : "bullet", relationIds.length ? (expanded ? "⌄" : "›") : "•");
+  caret.type = "button";
+  caret.setAttribute("aria-label", relationIds.length ? (expanded ? "折叠关联记录" : "展开关联记录") : "没有关联记录");
+  caret.setAttribute("aria-expanded", relationIds.length ? String(expanded) : "false");
+  caret.disabled = !relationIds.length;
+  if (relationIds.length) {
+    caret.addEventListener("click", () => {
+      const expandedSet = panelState(panelName);
+      if (expandedSet.has(fsrsKey)) expandedSet.delete(fsrsKey);
+      else expandedSet.add(fsrsKey);
+      render();
+    });
+  }
+  linkedHeader.append(caret);
+  linkedHeader.append(element("h2", "section-title", `关联知识记录（${relationIds.length}）`));
+  linked.append(linkedHeader);
   if (!relationIds.length) {
     linked.append(element("p", "empty-copy", "该 FSRS 对象没有关联知识记录。"));
-  } else {
-    const list = element("div", "preview-list");
+  } else if (expanded) {
+    const list = element("div", "outline fsrs-records");
     for (const id of relationIds) {
       const record = state.model.recordsById.get(id);
       if (!record) continue;
-      const card = element("div", "preview-card");
-      card.append(recordLink(record, panelName));
-      card.append(element("span", "preview-id", `#${record.id}`));
-      list.append(card);
+      renderRecordNode(list, record, panelName);
     }
     linked.append(list);
   }
@@ -421,7 +448,7 @@ function zoomOut() {
 
 window.addEventListener("popstate", () => {
   state.mainRoute = parseRoute(window.location.pathname);
-  state.expanded.main = new Set(state.mainRoute.kind === "record" ? [state.mainRoute.id] : []);
+  state.expanded.main = expandedForRoute(state.mainRoute);
   state.openRelations = new Set();
   render();
 });

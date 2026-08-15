@@ -118,6 +118,7 @@ kbd { background: #fff; border: 1px solid var(--line-strong); border-radius: 5px
 .breadcrumbs { align-items: center; display: flex; flex-wrap: wrap; gap: 4px; }
 .breadcrumb-link { background: transparent; border: 0; color: var(--cyan); cursor: pointer; font-size: 12px; padding: 2px 4px; }
 .breadcrumb-link:hover { text-decoration: underline; }
+.breadcrumb-label { color: var(--cyan); font-size: 12px; padding: 2px 4px; }
 .breadcrumb-separator { color: var(--quiet); font-size: 12px; }
 .panel-title { font-size: clamp(22px, 3vw, 33px); letter-spacing: -0.035em; line-height: 1.2; margin: 18px 0 8px; max-width: 900px; overflow-wrap: anywhere; }
 .panel-hint { color: var(--muted); font-size: 13px; margin: 0; }
@@ -128,6 +129,7 @@ kbd { background: #fff; border: 1px solid var(--line-strong); border-radius: 5px
 .record-item { position: relative; }
 .record-row { align-items: flex-start; border-radius: 9px; display: flex; gap: 8px; min-height: 38px; padding: 5px 6px; position: relative; }
 .record-row:hover, .record-item:focus-within > .record-row { background: #f8fafc; }
+.record-marker { flex: 0 0 auto; position: relative; }
 .caret, .bullet { align-items: center; background: transparent; border: 0; color: var(--muted); display: inline-flex; flex: 0 0 22px; font-size: 19px; height: 28px; justify-content: center; line-height: 1; margin-top: 1px; padding: 0; width: 22px; }
 .caret { cursor: pointer; }
 .caret:hover { color: var(--cyan); }
@@ -142,8 +144,8 @@ kbd { background: #fff; border: 1px solid var(--line-strong); border-radius: 5px
 .count-button:not(:disabled):hover { background: var(--cyan-soft); color: var(--cyan); }
 .count-button:disabled { cursor: default; opacity: 0.72; }
 .record-children { border-left: 1px solid var(--line-strong); margin-left: 16px; padding-left: 16px; }
-.record-popover { background: var(--navy); border-radius: 9px; box-shadow: 0 10px 28px rgba(16, 42, 67, 0.2); color: #e5f6fb; display: none; font-size: 11px; left: 31px; max-width: min(460px, calc(100vw - 80px)); padding: 9px 11px; position: absolute; top: 35px; z-index: 5; }
-.record-item:focus-within > .record-popover, .record-item:hover > .record-popover { display: block; }
+.record-popover { background: var(--navy); border-radius: 9px; box-shadow: 0 10px 28px rgba(16, 42, 67, 0.2); color: #e5f6fb; display: none; font-size: 11px; left: 0; max-width: min(460px, calc(100vw - 80px)); padding: 9px 11px; position: absolute; top: 28px; z-index: 5; }
+.record-marker:focus-within > .record-popover, .record-marker:hover > .record-popover { display: block; }
 .meta-line { display: flex; gap: 12px; justify-content: space-between; }
 .meta-key { color: var(--quiet); flex: 0 0 auto; font-size: 11px; }
 .meta-value { color: inherit; overflow-wrap: anywhere; text-align: right; }
@@ -169,6 +171,9 @@ kbd { background: #fff; border: 1px solid var(--line-strong); border-radius: 5px
 .fsrs-field { background: #fff; display: flex; gap: 20px; justify-content: space-between; padding: 11px 14px; }
 .fsrs-value { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 70%; overflow-wrap: anywhere; text-align: right; }
 .fsrs-links { margin-left: 0; }
+.fsrs-links-header { align-items: center; display: flex; gap: 8px; }
+.fsrs-links-header .section-title { margin-bottom: 0; }
+.fsrs-records { margin-top: 10px; }
 
 .search-results { background: #fff; border-bottom: 1px solid var(--line); box-shadow: 0 14px 28px rgba(16, 42, 67, 0.07); margin: 0 auto; max-height: min(52vh, 560px); max-width: 1020px; overflow: auto; padding: 18px 28px 22px; position: relative; z-index: 4; }
 .search-results-header { align-items: baseline; display: flex; gap: 12px; margin-bottom: 10px; }
