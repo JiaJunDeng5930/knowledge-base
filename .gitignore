@@ -1,0 +1,5 @@
+tools/knowledge-viewer/.env
+tools/knowledge-viewer/.env.*
+!tools/knowledge-viewer/.env.example
+__pycache__/
+*.py[cod]

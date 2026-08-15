@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Knowledge Viewer</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/root" data-nav-route="root" aria-label="返回根目录">
+          <span class="brand-mark" aria-hidden="true">◎</span>
+          <span>Knowledge Viewer</span>
+        </a>
+        <label class="search-box" for="search-input">
+          <span class="search-symbol" aria-hidden="true">⌕</span>
+          <input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="搜索知识记录…" />
+          <kbd>⌘ U</kbd>
+        </label>
+        <div class="topbar-note">只读快照</div>
+      </header>
+
+      <section id="search-results" class="search-results" hidden aria-live="polite"></section>
+
+      <main id="workspace" class="workspace" aria-label="知识库查看器">
+        <section id="main-panel" class="panel panel-main" aria-label="主栏">
+          <div class="panel-loading">正在读取知识库…</div>
+        </section>
+        <aside id="context-panel" class="panel panel-context" aria-label="右栏上下文">
+          <div class="context-empty">
+            <span class="context-empty-mark" aria-hidden="true">↗</span>
+            <h2>右栏上下文</h2>
+            <p>按住 Shift 点击记录，在这里打开第二个只读上下文。</p>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
