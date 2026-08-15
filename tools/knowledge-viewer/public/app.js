@@ -30,10 +30,10 @@ function element(tag, className, text = null) {
 function parseRoute(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/" || path === "/root") return { kind: "root" };
-  const record = path.match(/^\/record\/([^/]+)$/);
-  if (record && /^[0-9]+$/.test(record[1])) return { kind: "record", id: record[1] };
-  const fsrs = path.match(/^\/fsrs\/([^/]+)$/);
-  if (fsrs && /^[0-9]+$/.test(fsrs[1])) return { kind: "fsrs", id: fsrs[1] };
+  const record = path.match(/^\/record\/(-?[0-9]+)$/);
+  if (record) return { kind: "record", id: record[1] };
+  const fsrs = path.match(/^\/fsrs\/(-?[0-9]+)$/);
+  if (fsrs) return { kind: "fsrs", id: fsrs[1] };
   return { kind: "unknown" };
 }
 
@@ -140,8 +140,8 @@ function renderMetaPopover(item, record) {
   item.append(popover);
 }
 
-function recordLink(record, panelName, className = "preview-link") {
-  const link = element("button", className, summarize(record.body));
+function recordLink(record, panelName, className = "preview-link", label = summarize(record.body)) {
+  const link = element("button", className, label);
   link.type = "button";
   link.dataset.recordId = record.id;
   link.addEventListener("click", (event) => {
@@ -196,7 +196,7 @@ function renderRecordNode(parent, record, panelName) {
   }
   row.append(caret);
 
-  const body = recordLink(record, panelName, "record-body");
+  const body = recordLink(record, panelName, "record-body", record.body);
   body.title = "点击 zoom；Shift-click 在右栏打开";
   row.append(body);
 

@@ -4,17 +4,15 @@ Knowledge Viewer 是一个本地运行的只读知识库查看器。服务端从
 
 ## 启动
 
-先准备环境变量：
+当前开发机器已经在 Git 忽略的 `.env` 中配置 Supabase 连接。直接运行：
 
 ```sh
-export SUPABASE_URL='https://your-project.supabase.co'
-export SUPABASE_KEY='your-anon-or-publishable-key'
-python3 tools/knowledge-viewer/server.py
+tools/knowledge-viewer/run
 ```
 
 然后打开 <http://127.0.0.1:8765/root>。服务默认只绑定 loopback 地址；可以用 `--port` 选择其他本地端口，`--host` 只能使用 loopback 地址。
 
-`SUPABASE_KEY` 只能使用当前部署允许 Data API 读取的 anon 或 publishable key。不要把 secret、service-role key 或任何真实 key 写入仓库。可以复制 `.env.example` 为 `.env` 后在 shell 中加载；`.env` 已被根 `.gitignore` 忽略。
+在其他机器上运行时，先复制 `.env.example` 为 `.env` 并填入 Supabase URL 与 anon 或 publishable key。`run` 会加载该文件。`SUPABASE_KEY` 不得使用 secret 或 service-role key；真实 key 不进入 Git。
 
 ## 固定读取边界
 

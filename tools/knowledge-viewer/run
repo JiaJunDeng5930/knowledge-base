@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+viewer_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -f "$viewer_dir/.env" ]; then
+  set -a
+  . "$viewer_dir/.env"
+  set +a
+fi
+
+exec python3 "$viewer_dir/server.py" "$@"

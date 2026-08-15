@@ -281,7 +281,7 @@ class SupabaseClient:
                 method="GET",
             )
             try:
-                with self.opener(request, timeout=30) as response:
+                with self.opener(request) as response:
                     status = getattr(response, "status", None)
                     if status is None:
                         status = response.getcode()
@@ -370,7 +370,7 @@ class KnowledgeViewerHandler(BaseHTTPRequestHandler):
         if path == "/api/snapshot":
             self._snapshot()
             return
-        if path in {"/", "/root"} or re.fullmatch(r"/record/[0-9]+", path) or re.fullmatch(r"/fsrs/[0-9]+", path):
+        if path in {"/", "/root"} or re.fullmatch(r"/record/-?[0-9]+", path) or re.fullmatch(r"/fsrs/-?[0-9]+", path):
             self._static("index.html", "text/html; charset=utf-8")
             return
         if path == "/app.js":

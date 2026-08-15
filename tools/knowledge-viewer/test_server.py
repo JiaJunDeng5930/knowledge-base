@@ -59,7 +59,7 @@ class PagedOpener:
         self.rows_by_table = rows_by_table
         self.requests = []
 
-    def __call__(self, request, timeout):
+    def __call__(self, request):
         self.requests.append(request)
         parsed = urllib.parse.urlsplit(request.full_url)
         table = parsed.path.rsplit("/", 1)[-1]
@@ -124,10 +124,14 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             with urllib.request.urlopen(base + "/") as response:
                 self.assertEqual(response.status, 200)
                 self.assertIn("Knowledge Viewer", response.read().decode("utf-8"))
+            with urllib.request.urlopen(base + "/record/-2") as response:
+                self.assertEqual(response.status, 200)
+            with urllib.request.urlopen(base + "/fsrs/-2") as response:
+                self.assertEqual(response.status, 200)
         finally:
             server.shutdown()
             server.server_close()
-            thread.join(timeout=2)
+            thread.join()
 
     def test_http_error_is_generic(self):
         secret = "anon-secret-value"
@@ -147,7 +151,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
-            thread.join(timeout=2)
+            thread.join()
 
     def test_server_rejects_non_loopback_binding(self):
         with self.assertRaises(ConfigurationError):
