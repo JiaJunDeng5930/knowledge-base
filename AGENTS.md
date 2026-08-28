@@ -36,10 +36,10 @@
 | 路径 | 职责 |
 | --- | --- |
 | `AGENTS.md` | 记录工程目标、稳定概念、目录职责和扩展边界。 |
-| `supabase/schemas/knowledge_base.sql` | 核心知识模型的权威声明式 schema；定义知识记录、记录级引用、可继承标签、FSRS 状态及二者关联。 |
+| `skills/knowledge-base/schema.sql` | 核心知识模型的唯一权威声明式 schema，随通用 skill 保存。 |
 | `tools/` | 开发、检查和维护本仓库时使用的辅助工具。认知活动中操作知识库的工具不放在这里。 |
 | `tools/knowledge-viewer/` | 本地只读知识库查看器。`run` 是启动入口，`server.py` 通过固定查询读取 Supabase 当前快照，`public/` 展示有序森林、有效标签、记录级引用和 FSRS 关联，并提供搜索与定位能力。该工具不提供知识库写入接口，也不属于认知活动中操作知识库的工具。 |
-| `skills/knowledge-base/` | 整个知识库的通用 skill 所在目录。建立实现时以 `SKILL.md` 作为入口；该 skill 使用的知识库操作工具也放在此目录中。 |
+| `skills/knowledge-base/` | 整个知识库的通用 skill 所在目录，以 `SKILL.md` 为入口；`fsrs/SKILL.md` 提供按需加载的 FSRS 数据知识，该模块的计算脚本位于 `fsrs/scripts/`。 |
 | `skills/scenarios/` | 各类认知活动的场景 skill 所在目录。每个场景使用独立子目录，并在自己的目录中保存该场景使用的知识库操作工具。 |
 
 除非已有实现需要，不预先增加应用框架、通用注册框架或第二份 schema 表示。
