@@ -210,7 +210,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         config = SupabaseConfig.from_environment(
             {
                 "SUPABASE_URL": "https://example.supabase.co",
-                "SUPABASE_SECRET_KEY": "sb_secret_viewer-test",
+                "SUPABASE_KEY": "sb_publishable_viewer-test",
             }
         )
         client = SupabaseClient(config, opener=opener, page_size=2)
@@ -254,15 +254,17 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         ]
         self.assertEqual(offsets, ["0", "2", "3"])
         self.assertEqual(record_requests[0].get_method(), "GET")
-        self.assertEqual(record_requests[0].headers["Apikey"], "sb_secret_viewer-test")
+        self.assertEqual(
+            record_requests[0].headers["Apikey"], "sb_publishable_viewer-test"
+        )
         self.assertNotIn("Authorization", record_requests[0].headers)
 
-    def test_legacy_service_role_is_sent_as_apikey_and_bearer(self):
-        secret = legacy_jwt("service_role")
+    def test_legacy_anon_is_sent_as_apikey_and_bearer(self):
+        key = legacy_jwt("anon")
         config = SupabaseConfig.from_environment(
             {
                 "SUPABASE_URL": "https://example.supabase.co",
-                "SUPABASE_SECRET_KEY": secret,
+                "SUPABASE_KEY": key,
             }
         )
         opener = PagedOpener({"fsrs_review": []})
@@ -271,33 +273,33 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             "fsrs_review", "id", "id"
         )
 
-        self.assertEqual(opener.requests[0].headers["Apikey"], secret)
-        self.assertEqual(opener.requests[0].headers["Authorization"], f"Bearer {secret}")
+        self.assertEqual(opener.requests[0].headers["Apikey"], key)
+        self.assertEqual(opener.requests[0].headers["Authorization"], f"Bearer {key}")
 
-    def test_configuration_accepts_only_server_secret_environment(self):
+    def test_configuration_accepts_only_publishable_environment(self):
         url = "https://example.supabase.co"
         invalid_environments = (
             {"SUPABASE_URL": url},
-            {"SUPABASE_KEY": "sb_secret_old-name"},
-            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": "sb_publishable_browser"},
-            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": legacy_jwt("anon")},
+            {"SUPABASE_URL": url, "SUPABASE_KEY": "sb_secret_server"},
+            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": "sb_secret_server"},
+            {"SUPABASE_URL": url, "SUPABASE_KEY": legacy_jwt("service_role")},
         )
         for environment in invalid_environments:
             with self.subTest(environment=environment):
                 with self.assertRaises(ConfigurationError):
                     SupabaseConfig.from_environment(environment)
 
-        secret_config = SupabaseConfig.from_environment(
-            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": "sb_secret_viewer-test"}
+        publishable_config = SupabaseConfig.from_environment(
+            {"SUPABASE_URL": url, "SUPABASE_KEY": "sb_publishable_viewer-test"}
         )
-        legacy_config = SupabaseConfig.from_environment(
+        legacy_anon_config = SupabaseConfig.from_environment(
             {
                 "SUPABASE_URL": url,
-                "SUPABASE_SECRET_KEY": legacy_jwt("service_role"),
+                "SUPABASE_KEY": legacy_jwt("anon"),
             }
         )
-        self.assertFalse(secret_config.legacy_service_role)
-        self.assertTrue(legacy_config.legacy_service_role)
+        self.assertFalse(publishable_config.legacy_anon)
+        self.assertTrue(legacy_anon_config.legacy_anon)
 
     def test_http_surface_is_get_only_and_does_not_leak_errors(self):
         server = make_server("127.0.0.1", 0, snapshot_loader=sample_snapshot)

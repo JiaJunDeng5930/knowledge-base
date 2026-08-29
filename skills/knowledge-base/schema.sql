@@ -262,14 +262,27 @@ create table public.fsrs_review (
 create index fsrs_review_object_time_idx
     on public.fsrs_review (fsrs_id, review_datetime, id);
 
--- 知识库只通过已授权的 SQL 通道和 service_role 使用。
--- public schema 暴露给 Data API，因此所有表默认拒绝没有策略的角色。
+-- Data API 使用 publishable key 读取知识快照；写入仍通过已授权的 SQL 通道。
+-- anon 角色只获得 SELECT 策略，不能通过 Data API 修改知识库。
 alter table public.knowledge_record enable row level security;
 alter table public.knowledge_reference enable row level security;
 alter table public.record_tag enable row level security;
 alter table public.fsrs enable row level security;
 alter table public.fsrs_knowledge enable row level security;
 alter table public.fsrs_review enable row level security;
+
+create policy knowledge_record_anon_select
+    on public.knowledge_record for select to anon using (true);
+create policy knowledge_reference_anon_select
+    on public.knowledge_reference for select to anon using (true);
+create policy record_tag_anon_select
+    on public.record_tag for select to anon using (true);
+create policy fsrs_anon_select
+    on public.fsrs for select to anon using (true);
+create policy fsrs_knowledge_anon_select
+    on public.fsrs_knowledge for select to anon using (true);
+create policy fsrs_review_anon_select
+    on public.fsrs_review for select to anon using (true);
 
 
 commit;

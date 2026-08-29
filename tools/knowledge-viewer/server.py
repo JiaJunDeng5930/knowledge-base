@@ -281,28 +281,26 @@ def _rows(value: Any, field: str) -> list[Mapping[str, Any]]:
 @dataclass(frozen=True)
 class SupabaseConfig:
     url: str
-    secret_key: str
-    legacy_service_role: bool
+    key: str
+    legacy_anon: bool
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> "SupabaseConfig":
         env = os.environ if environ is None else environ
         url = env.get("SUPABASE_URL", "").strip().rstrip("/")
-        secret_key = env.get("SUPABASE_SECRET_KEY", "")
+        key = env.get("SUPABASE_KEY", "")
         parsed = urllib.parse.urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ConfigurationError("SUPABASE_URL is unavailable")
-        if secret_key.startswith("sb_secret_") and len(secret_key) > len("sb_secret_"):
-            return cls(url=url, secret_key=secret_key, legacy_service_role=False)
-        if _jwt_role(secret_key) == "service_role":
-            return cls(url=url, secret_key=secret_key, legacy_service_role=True)
-        raise ConfigurationError(
-            "SUPABASE_SECRET_KEY must be a secret or service_role key"
-        )
+        if key.startswith("sb_publishable_") and len(key) > len("sb_publishable_"):
+            return cls(url=url, key=key, legacy_anon=False)
+        if _jwt_role(key) == "anon":
+            return cls(url=url, key=key, legacy_anon=True)
+        raise ConfigurationError("SUPABASE_KEY must be a publishable or anon key")
 
 
 def _jwt_role(value: str) -> str | None:
-    """读取 legacy JWT 的角色，只用于拒绝 anon key 配置。"""
+    """读取 legacy JWT 的角色，只用于识别旧版 anon key。"""
 
     parts = value.split(".")
     if len(parts) != 3:
@@ -395,10 +393,10 @@ class SupabaseClient:
             endpoint = f"{self.config.url}/rest/v1/{table}?{params}"
             headers = {
                 "Accept": "application/json",
-                "apikey": self.config.secret_key,
+                "apikey": self.config.key,
             }
-            if self.config.legacy_service_role:
-                headers["Authorization"] = f"Bearer {self.config.secret_key}"
+            if self.config.legacy_anon:
+                headers["Authorization"] = f"Bearer {self.config.key}"
             request = urllib.request.Request(endpoint, headers=headers, method="GET")
             try:
                 with self.opener(request) as response:
