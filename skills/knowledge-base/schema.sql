@@ -151,7 +151,8 @@ create index record_tag_tag_idx
 
 -- 这里只持久化直接标签。
 -- 有效标签通过森林结构实时得到，不给每个后代复制一份标签。
-create view public.effective_record_tag as
+create view public.effective_record_tag
+with (security_invoker = true) as
 with recursive inherited_tag (record_id, tag) as (
     -- 直接标签首先对记录自身生效。
     select
@@ -261,7 +262,13 @@ create table public.fsrs_review (
 create index fsrs_review_object_time_idx
     on public.fsrs_review (fsrs_id, review_datetime, id);
 
--- 历史通过已授权的 SQL 通道使用，Data API 访问需要相应的授权策略。
+-- 知识库只通过已授权的 SQL 通道和 service_role 使用。
+-- public schema 暴露给 Data API，因此所有表默认拒绝没有策略的角色。
+alter table public.knowledge_record enable row level security;
+alter table public.knowledge_reference enable row level security;
+alter table public.record_tag enable row level security;
+alter table public.fsrs enable row level security;
+alter table public.fsrs_knowledge enable row level security;
 alter table public.fsrs_review enable row level security;
 
 

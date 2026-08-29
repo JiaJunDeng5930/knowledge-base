@@ -31,3 +31,11 @@
 | 用户要求 | schema 保存数据定义。Python 脚本提供 FSRS 计算服务；agent 使用独立的数据库接口完成读写。 |
 | 用户给出的原因 | agent 可能分别拥有 Python 工具与数据库接口，但 Python 执行环境无法调用数据库接口。 |
 | 实际改动 | 移除 schema 中的数据操作函数；保持 Python 脚本接收和返回 JSON；将普通 SQL 保存为 skill 的查询资料，并说明由 agent 通过数据库接口执行。 |
+
+## 2026-08-29：个人知识库默认拒绝 Data API 访问
+
+| 项目 | 记录 |
+| --- | --- |
+| 用户要求 | 将当前 schema 部署到个人使用的 Supabase 项目。 |
+| 用户给出的原因 | 该知识库只供个人使用。 |
+| 实际改动 | 为全部知识库表启用 RLS，不创建 `anon` 或 `authenticated` 策略；将 `effective_record_tag` 设为 `security_invoker`，使视图遵守底层表的 RLS。已授权的 SQL 通道与 `service_role` 保持可用。 |
