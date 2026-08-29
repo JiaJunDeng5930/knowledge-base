@@ -170,6 +170,16 @@ kbd { background: #fff; border: 1px solid var(--line-strong); border-radius: 5px
 .fsrs-detail { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 1px; margin-bottom: 24px; overflow: hidden; }
 .fsrs-field { background: #fff; display: flex; gap: 20px; justify-content: space-between; padding: 11px 14px; }
 .fsrs-value { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 70%; overflow-wrap: anywhere; text-align: right; }
+.fsrs-section { border-top: 1px solid var(--line); margin-bottom: 24px; padding-top: 18px; }
+.scheduler-config { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.55; margin: 10px 0 0; overflow: auto; padding: 14px; white-space: pre-wrap; }
+.review-list { border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.review-item { background: #fff; border-bottom: 1px solid var(--line); padding: 11px 14px; }
+.review-item:last-child { border-bottom: 0; }
+.review-header, .review-metadata { align-items: baseline; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; }
+.review-time { color: var(--ink); font-size: 13px; }
+.review-metadata { color: var(--muted); font-size: 12px; margin-top: 5px; }
+.review-rating { color: var(--navy); font-weight: 600; }
+.review-duration { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .fsrs-links { margin-left: 0; }
 .fsrs-links-header { align-items: center; display: flex; gap: 8px; }
 .fsrs-links-header .section-title { margin-bottom: 0; }

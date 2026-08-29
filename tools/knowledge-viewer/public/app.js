@@ -7,6 +7,17 @@ const mainPanel = document.querySelector("#main-panel");
 const contextPanel = document.querySelector("#context-panel");
 const searchInput = document.querySelector("#search-input");
 const searchResults = document.querySelector("#search-results");
+const FSRS_STATE_LABELS = Object.freeze({
+  1: "Learning（学习）",
+  2: "Review（复习）",
+  3: "Relearning（重新学习）",
+});
+const FSRS_RATING_LABELS = Object.freeze({
+  1: "Again",
+  2: "Hard",
+  3: "Good",
+  4: "Easy",
+});
 
 const initialMainRoute = parseRoute(window.location.pathname);
 const state = {
@@ -312,10 +323,13 @@ function renderFsrsPanel(container, route, panelName) {
   const detail = element("section", "fsrs-detail");
   const fields = [
     ["id", fsrs.id],
+    ["状态", `${fsrs.state} · ${FSRS_STATE_LABELS[fsrs.state] || "未知"}`],
+    ["Step", fsrs.step === null ? "不适用" : String(fsrs.step)],
     ["Stability", fsrs.stability_days === null ? "尚未估计" : `${fsrs.stability_days} 天`],
     ["Difficulty", fsrs.difficulty === null ? "尚未估计" : String(fsrs.difficulty)],
     ["最后复习", fsrs.last_review_at === null ? "尚未复习" : fsrs.last_review_at],
     ["下次到期", fsrs.due_at],
+    ["Revision", String(fsrs.revision)],
   ];
   for (const [name, value] of fields) {
     const field = element("div", "fsrs-field");
@@ -324,6 +338,43 @@ function renderFsrsPanel(container, route, panelName) {
     detail.append(field);
   }
   container.append(detail);
+
+  const scheduler = element("section", "fsrs-section");
+  scheduler.append(element("h2", "section-title", "Scheduler 配置"));
+  scheduler.append(element("pre", "scheduler-config", JSON.stringify(fsrs.scheduler, null, 2)));
+  container.append(scheduler);
+
+  const reviews = state.model.reviewsByFsrs.get(fsrs.id) || [];
+  const history = element("section", "fsrs-section fsrs-history");
+  history.append(element("h2", "section-title", `复习历史（${reviews.length}）`));
+  if (!reviews.length) {
+    history.append(element("p", "empty-copy", "该 FSRS 对象没有复习历史。"));
+  } else {
+    const list = element("div", "review-list");
+    for (const review of reviews) {
+      const item = element("article", "review-item");
+      const header = element("div", "review-header");
+      header.append(element("time", "review-time", review.review_datetime));
+      header.append(element("span", "preview-id", `#${review.id}`));
+      item.append(header);
+
+      const metadata = element("div", "review-metadata");
+      metadata.append(element(
+        "span",
+        "review-rating",
+        `${FSRS_RATING_LABELS[review.rating] || "未知"}（${review.rating}）`,
+      ));
+      metadata.append(element(
+        "span",
+        "review-duration",
+        review.review_duration === null ? "用时未记录" : `${review.review_duration} ms`,
+      ));
+      item.append(metadata);
+      list.append(item);
+    }
+    history.append(list);
+  }
+  container.append(history);
 
   const relationIds = state.model.recordsByFsrs.get(fsrs.id) || [];
   const linked = element("section", "fsrs-links");

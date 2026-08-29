@@ -17,8 +17,23 @@ const snapshot = {
     { source_record_id: "9007199254740993", target_record_id: "1" },
   ],
   effective_tags: [{ record_id: "2", tag: "working" }],
-  fsrs: [{ id: "10", stability_days: 4.5, difficulty: 6, last_review_at: "2026-08-01T00:00:00Z", due_at: "2026-08-05T00:00:00Z" }],
+  fsrs: [{
+    id: "10",
+    state: 2,
+    step: null,
+    stability_days: 4.5,
+    difficulty: 6,
+    last_review_at: "2026-08-01T00:00:00Z",
+    due_at: "2026-08-05T00:00:00Z",
+    scheduler: { desired_retention: 0.9 },
+    revision: "3",
+  }],
   fsrs_knowledge: [{ fsrs_id: "10", record_id: "2" }],
+  fsrs_review: [
+    { id: "11", fsrs_id: "10", rating: 3, review_datetime: "2026-08-02T00:00:00Z", review_duration: "1500" },
+    { id: "10", fsrs_id: "10", rating: 2, review_datetime: "2026-08-02T00:00:00Z", review_duration: null },
+    { id: "9007199254740994", fsrs_id: "10", rating: 4, review_datetime: "2026-08-01T00:00:00Z", review_duration: "900" },
+  ],
 };
 
 const model = buildKnowledgeModel(snapshot);
@@ -31,5 +46,10 @@ assert.deepEqual(model.outgoingById.get("1"), ["2"]);
 assert.deepEqual(model.incomingById.get("1"), ["9007199254740993"]);
 assert.deepEqual(model.tagsById.get("2"), ["working"]);
 assert.deepEqual(model.recordsByFsrs.get("10"), ["2"]);
+assert.deepEqual(
+  model.reviewsByFsrs.get("10").map((review) => review.id),
+  ["9007199254740994", "10", "11"],
+);
+assert.equal(model.reviewsByFsrs.get("10")[1].review_duration, null);
 
 console.log("model tests passed");

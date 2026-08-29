@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """知识库 Supabase schema 的本地只读查看器服务。
 
-浏览器只连接此进程。本模块将 Supabase 读取边界固定为五个 REST GET
+浏览器只连接此进程。本模块将 Supabase 读取边界固定为六个 REST GET
 查询，并由 HTTP handler 只暴露快照和静态资源。
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import ipaddress
 import json
 import os
@@ -30,6 +32,8 @@ PUBLIC_ROOT = ROOT / "public"
 DEFAULT_PORT = 8765
 PAGE_SIZE = 1000
 DECIMAL_ID = re.compile(r"-?(?:0|[1-9][0-9]*)\Z")
+FSRS_STATES = frozenset({1, 2, 3})
+FSRS_RATINGS = frozenset({1, 2, 3, 4})
 
 
 class ViewerError(Exception):
@@ -83,6 +87,38 @@ def _integer(value: Any, *, field: str) -> int:
     return value
 
 
+def _optional_integer(value: Any, *, field: str) -> int | None:
+    if value is None:
+        return None
+    return _integer(value, field=field)
+
+
+def _enum_integer(value: Any, *, field: str, allowed: frozenset[int]) -> int:
+    result = _integer(value, field=field)
+    if result not in allowed:
+        raise UpstreamError(f"invalid {field}")
+    return result
+
+
+def _json_object(value: Any, *, field: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or any(not isinstance(key, str) for key in value):
+        raise UpstreamError(f"invalid {field}")
+    return dict(value)
+
+
+def _nonnegative_decimal_string(value: Any, *, field: str) -> str:
+    result = _decimal_string(value, field=field)
+    if result.startswith("-"):
+        raise UpstreamError(f"invalid {field}")
+    return result
+
+
+def _optional_nonnegative_decimal_string(value: Any, *, field: str) -> str | None:
+    if value is None:
+        return None
+    return _nonnegative_decimal_string(value, field=field)
+
+
 def _text(value: Any, *, field: str) -> str:
     if not isinstance(value, str):
         raise UpstreamError(f"invalid {field}")
@@ -102,6 +138,7 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
         "effective_tags",
         "fsrs",
         "fsrs_knowledge",
+        "fsrs_review",
     )
     if not isinstance(raw, Mapping) or any(key not in raw for key in expected):
         raise UpstreamError("invalid snapshot")
@@ -148,20 +185,45 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
 
     fsrs: list[dict[str, Any]] = []
     for row in _rows(raw["fsrs"], "fsrs"):
+        state = _enum_integer(
+            row.get("state"), field="fsrs state", allowed=FSRS_STATES
+        )
+        step = _optional_integer(row.get("step"), field="fsrs step")
+        if (state == 2 and step is not None) or (
+            state in {1, 3} and (step is None or step < 0)
+        ):
+            raise UpstreamError("invalid fsrs step")
+        stability_days = _optional_finite_number(
+            row.get("stability_days"), field="fsrs stability_days"
+        )
+        difficulty = _optional_finite_number(
+            row.get("difficulty"), field="fsrs difficulty"
+        )
+        last_review_at = (
+            None
+            if row.get("last_review_at") is None
+            else _text(row["last_review_at"], field="fsrs last_review_at")
+        )
+        memory_state = (stability_days, difficulty, last_review_at)
+        if any(value is None for value in memory_state) and any(
+            value is not None for value in memory_state
+        ):
+            raise UpstreamError("invalid fsrs memory state")
         fsrs.append(
             {
                 "id": _decimal_string(row.get("id"), field="fsrs id"),
-                "stability_days": _optional_finite_number(
-                    row.get("stability_days"), field="fsrs stability_days"
-                ),
-                "difficulty": _optional_finite_number(
-                    row.get("difficulty"), field="fsrs difficulty"
-                ),
-                "last_review_at": (
-                    None if row.get("last_review_at") is None
-                    else _text(row["last_review_at"], field="fsrs last_review_at")
-                ),
+                "state": state,
+                "step": step,
+                "stability_days": stability_days,
+                "difficulty": difficulty,
+                "last_review_at": last_review_at,
                 "due_at": _text(row.get("due_at"), field="fsrs due_at"),
+                "scheduler": _json_object(
+                    row.get("scheduler"), field="fsrs scheduler"
+                ),
+                "revision": _nonnegative_decimal_string(
+                    row.get("revision"), field="fsrs revision"
+                ),
             }
         )
 
@@ -178,12 +240,35 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
             }
         )
 
+    fsrs_review: list[dict[str, Any]] = []
+    for row in _rows(raw["fsrs_review"], "fsrs_review"):
+        fsrs_review.append(
+            {
+                "id": _decimal_string(row.get("id"), field="fsrs_review id"),
+                "fsrs_id": _decimal_string(
+                    row.get("fsrs_id"), field="fsrs_review fsrs_id"
+                ),
+                "rating": _enum_integer(
+                    row.get("rating"),
+                    field="fsrs_review rating",
+                    allowed=FSRS_RATINGS,
+                ),
+                "review_datetime": _text(
+                    row.get("review_datetime"), field="fsrs_review review_datetime"
+                ),
+                "review_duration": _optional_nonnegative_decimal_string(
+                    row.get("review_duration"), field="fsrs_review review_duration"
+                ),
+            }
+        )
+
     return {
         "records": records,
         "references": references,
         "effective_tags": effective_tags,
         "fsrs": fsrs,
         "fsrs_knowledge": fsrs_knowledge,
+        "fsrs_review": fsrs_review,
     }
 
 
@@ -196,17 +281,41 @@ def _rows(value: Any, field: str) -> list[Mapping[str, Any]]:
 @dataclass(frozen=True)
 class SupabaseConfig:
     url: str
-    key: str
+    secret_key: str
+    legacy_service_role: bool
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> "SupabaseConfig":
         env = os.environ if environ is None else environ
         url = env.get("SUPABASE_URL", "").strip().rstrip("/")
-        key = env.get("SUPABASE_KEY", "")
+        secret_key = env.get("SUPABASE_SECRET_KEY", "")
         parsed = urllib.parse.urlsplit(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc or not key:
-            raise ConfigurationError("Supabase configuration is unavailable")
-        return cls(url=url, key=key)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ConfigurationError("SUPABASE_URL is unavailable")
+        if secret_key.startswith("sb_secret_") and len(secret_key) > len("sb_secret_"):
+            return cls(url=url, secret_key=secret_key, legacy_service_role=False)
+        if _jwt_role(secret_key) == "service_role":
+            return cls(url=url, secret_key=secret_key, legacy_service_role=True)
+        raise ConfigurationError(
+            "SUPABASE_SECRET_KEY must be a secret or service_role key"
+        )
+
+
+def _jwt_role(value: str) -> str | None:
+    """读取 legacy JWT 的角色，只用于拒绝 anon key 配置。"""
+
+    parts = value.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        padding = "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(parts[1] + padding))
+    except (binascii.Error, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    role = payload.get("role")
+    return role if isinstance(role, str) else None
 
 
 TABLES: tuple[tuple[str, str, str], ...] = (
@@ -227,13 +336,18 @@ TABLES: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "fsrs",
-        "id,stability_days,difficulty,last_review_at,due_at",
+        "id,state,step,stability_days,difficulty,last_review_at,due_at,scheduler,revision",
         "id",
     ),
     (
         "fsrs_knowledge",
         "fsrs_id,record_id",
         "fsrs_id,record_id",
+    ),
+    (
+        "fsrs_review",
+        "id,fsrs_id,rating,review_datetime,review_duration",
+        "id",
     ),
 )
 
@@ -261,6 +375,7 @@ class SupabaseClient:
                 "effective_record_tag": "effective_tags",
                 "fsrs": "fsrs",
                 "fsrs_knowledge": "fsrs_knowledge",
+                "fsrs_review": "fsrs_review",
             }[table]
             raw[raw_key] = self._fetch_all(table, select, order)
         return normalize_snapshot(raw)
@@ -278,15 +393,13 @@ class SupabaseClient:
                 }
             )
             endpoint = f"{self.config.url}/rest/v1/{table}?{params}"
-            request = urllib.request.Request(
-                endpoint,
-                headers={
-                    "Accept": "application/json",
-                    "apikey": self.config.key,
-                    "Authorization": f"Bearer {self.config.key}",
-                },
-                method="GET",
-            )
+            headers = {
+                "Accept": "application/json",
+                "apikey": self.config.secret_key,
+            }
+            if self.config.legacy_service_role:
+                headers["Authorization"] = f"Bearer {self.config.secret_key}"
+            request = urllib.request.Request(endpoint, headers=headers, method="GET")
             try:
                 with self.opener(request) as response:
                     status = getattr(response, "status", None)

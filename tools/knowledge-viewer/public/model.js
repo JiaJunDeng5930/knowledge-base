@@ -73,6 +73,17 @@ export function buildKnowledgeModel(snapshot) {
   for (const ids of recordsByFsrs.values()) ids.sort(compareBigintStrings);
   for (const ids of fsrsByRecord.values()) ids.sort(compareBigintStrings);
 
+  const reviewsByFsrs = new Map();
+  for (const review of snapshot.fsrs_review) {
+    pushMapArray(reviewsByFsrs, review.fsrs_id, { ...review });
+  }
+  for (const reviews of reviewsByFsrs.values()) {
+    reviews.sort((left, right) => (
+      String(left.review_datetime).localeCompare(String(right.review_datetime)) ||
+      compareBigintStrings(left.id, right.id)
+    ));
+  }
+
   function getChildren(parentId) {
     return childrenByParent.get(parentId) || [];
   }
@@ -110,6 +121,7 @@ export function buildKnowledgeModel(snapshot) {
     fsrsById,
     recordsByFsrs,
     fsrsByRecord,
+    reviewsByFsrs,
     getChildren,
     getPath,
     search,

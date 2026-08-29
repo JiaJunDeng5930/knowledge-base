@@ -1,3 +1,4 @@
+import base64
 import json
 import threading
 import unittest
@@ -36,7 +37,31 @@ def sample_snapshot():
         "effective_tags": [],
         "fsrs": [],
         "fsrs_knowledge": [],
+        "fsrs_review": [],
     }
+
+
+def sample_fsrs(**overrides):
+    row = {
+        "id": "1",
+        "state": 1,
+        "step": 0,
+        "stability_days": None,
+        "difficulty": None,
+        "last_review_at": None,
+        "due_at": "2026-08-28T00:00:00+00:00",
+        "scheduler": {"desired_retention": 0.9},
+        "revision": "0",
+    }
+    row.update(overrides)
+    return row
+
+
+def legacy_jwt(role):
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"role": role}).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    return f"header.{payload}.signature"
 
 
 class FakeResponse:
@@ -71,50 +96,208 @@ class PagedOpener:
 
 
 class KnowledgeViewerServerTests(unittest.TestCase):
-    def test_normalize_accepts_unreviewed_fsrs(self):
+    def test_normalize_accepts_nullable_fsrs_fields_and_review_duration(self):
         snapshot = sample_snapshot()
-        snapshot["fsrs"] = [{
-            "id": "1", "stability_days": None, "difficulty": None,
-            "last_review_at": None, "due_at": "2026-08-28T00:00:00+00:00",
-        }]
-        result = normalize_snapshot(snapshot)["fsrs"][0]
-        self.assertIsNone(result["stability_days"])
-        self.assertIsNone(result["difficulty"])
-        self.assertIsNone(result["last_review_at"])
+        snapshot["fsrs"] = [
+            sample_fsrs(),
+            sample_fsrs(
+                id="2",
+                state=2,
+                step=None,
+                stability_days=2.5,
+                difficulty=4.0,
+                last_review_at="2026-08-28T01:00:00+00:00",
+            ),
+        ]
+        snapshot["fsrs_review"] = [
+            {
+                "id": "2",
+                "fsrs_id": "1",
+                "rating": 3,
+                "review_datetime": "2026-08-28T01:00:00+00:00",
+                "review_duration": None,
+            }
+        ]
 
-    def test_normalize_preserves_bigint_as_decimal_strings(self):
-        result = normalize_snapshot(sample_snapshot())
-        self.assertIsInstance(result["records"][0]["id"], str)
+        result = normalize_snapshot(snapshot)
+
+        self.assertIsNone(result["fsrs"][0]["stability_days"])
+        self.assertIsNone(result["fsrs"][0]["difficulty"])
+        self.assertIsNone(result["fsrs"][0]["last_review_at"])
+        self.assertEqual(result["fsrs"][0]["scheduler"], {"desired_retention": 0.9})
+        self.assertIsNone(result["fsrs"][1]["step"])
+        self.assertIsNone(result["fsrs_review"][0]["review_duration"])
+
+    def test_normalize_preserves_all_bigint_values_as_decimal_strings(self):
+        snapshot = sample_snapshot()
+        snapshot["fsrs"] = [sample_fsrs(id=3, revision=9007199254740994)]
+        snapshot["fsrs_review"] = [
+            {
+                "id": 9007199254740995,
+                "fsrs_id": 3,
+                "rating": 4,
+                "review_datetime": "2026-08-28T01:00:00+00:00",
+                "review_duration": 9007199254740996,
+            }
+        ]
+
+        result = normalize_snapshot(snapshot)
+
         self.assertEqual(result["records"][0]["id"], "9007199254740993")
         self.assertEqual(result["records"][0]["sibling_order"], "-2")
+        self.assertEqual(result["fsrs"][0]["id"], "3")
+        self.assertEqual(result["fsrs"][0]["revision"], "9007199254740994")
+        self.assertEqual(result["fsrs_review"][0]["id"], "9007199254740995")
+        self.assertEqual(result["fsrs_review"][0]["fsrs_id"], "3")
+        self.assertEqual(
+            result["fsrs_review"][0]["review_duration"], "9007199254740996"
+        )
 
-    def test_client_reads_until_empty_page(self):
+    def test_normalize_rejects_invalid_states_ratings_and_nullable_fields(self):
+        invalid_rows = (
+            (sample_fsrs(state=4), None),
+            (sample_fsrs(state=2, step=0), None),
+            (sample_fsrs(stability_days=1.0), None),
+            (sample_fsrs(scheduler=[]), None),
+            (
+                None,
+                {
+                    "id": "2",
+                    "fsrs_id": "1",
+                    "rating": 5,
+                    "review_datetime": "2026-08-28T01:00:00+00:00",
+                    "review_duration": None,
+                },
+            ),
+            (
+                None,
+                {
+                    "id": "2",
+                    "fsrs_id": "1",
+                    "rating": 3,
+                    "review_datetime": "2026-08-28T01:00:00+00:00",
+                    "review_duration": -1,
+                },
+            ),
+        )
+        for fsrs_row, review_row in invalid_rows:
+            with self.subTest(fsrs=fsrs_row, review=review_row):
+                snapshot = sample_snapshot()
+                snapshot["fsrs"] = [] if fsrs_row is None else [fsrs_row]
+                snapshot["fsrs_review"] = [] if review_row is None else [review_row]
+                with self.assertRaises(UpstreamError):
+                    normalize_snapshot(snapshot)
+
+    def test_client_runs_six_queries_and_reads_until_empty_page(self):
         rows = {
             "knowledge_record": [
-                {"id": "1", "body": "one", "parent_id": None, "depth": 0, "sibling_order": "0"},
-                {"id": "2", "body": "two", "parent_id": None, "depth": 0, "sibling_order": "1"},
-                {"id": "3", "body": "three", "parent_id": None, "depth": 0, "sibling_order": "2"},
+                {
+                    "id": str(index),
+                    "body": str(index),
+                    "parent_id": None,
+                    "depth": 0,
+                    "sibling_order": str(index - 1),
+                }
+                for index in range(1, 4)
             ],
             "knowledge_reference": [],
             "effective_record_tag": [],
             "fsrs": [],
             "fsrs_knowledge": [],
+            "fsrs_review": [],
         }
         opener = PagedOpener(rows)
-        client = SupabaseClient(SupabaseConfig("https://example.supabase.co", "anon-secret"), opener=opener, page_size=2)
+        config = SupabaseConfig.from_environment(
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "sb_secret_viewer-test",
+            }
+        )
+        client = SupabaseClient(config, opener=opener, page_size=2)
+
         result = client.fetch_snapshot()
+
         self.assertEqual([row["id"] for row in result["records"]], ["1", "2", "3"])
-        record_requests = [request for request in opener.requests if "/knowledge_record?" in request.full_url]
-        offsets = [urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)["offset"][0] for request in record_requests]
+        requested_tables = {
+            urllib.parse.urlsplit(request.full_url).path.rsplit("/", 1)[-1]
+            for request in opener.requests
+        }
+        self.assertEqual(requested_tables, set(rows))
+        requests_by_table = {
+            urllib.parse.urlsplit(request.full_url).path.rsplit("/", 1)[-1]: request
+            for request in opener.requests
+        }
+        fsrs_query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(requests_by_table["fsrs"].full_url).query
+        )
+        review_query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(requests_by_table["fsrs_review"].full_url).query
+        )
+        self.assertEqual(
+            fsrs_query["select"][0],
+            "id,state,step,stability_days,difficulty,last_review_at,due_at,scheduler,revision",
+        )
+        self.assertEqual(
+            review_query["select"][0],
+            "id,fsrs_id,rating,review_datetime,review_duration",
+        )
+        record_requests = [
+            request
+            for request in opener.requests
+            if "/knowledge_record?" in request.full_url
+        ]
+        offsets = [
+            urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)[
+                "offset"
+            ][0]
+            for request in record_requests
+        ]
         self.assertEqual(offsets, ["0", "2", "3"])
         self.assertEqual(record_requests[0].get_method(), "GET")
-        self.assertEqual(record_requests[0].headers["Apikey"], "anon-secret")
+        self.assertEqual(record_requests[0].headers["Apikey"], "sb_secret_viewer-test")
+        self.assertNotIn("Authorization", record_requests[0].headers)
 
-    def test_configuration_does_not_accept_missing_values(self):
-        with self.assertRaises(ConfigurationError):
-            SupabaseConfig.from_environment({"SUPABASE_URL": "https://example.supabase.co"})
-        with self.assertRaises(ConfigurationError):
-            SupabaseConfig.from_environment({"SUPABASE_KEY": "anon-secret"})
+    def test_legacy_service_role_is_sent_as_apikey_and_bearer(self):
+        secret = legacy_jwt("service_role")
+        config = SupabaseConfig.from_environment(
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": secret,
+            }
+        )
+        opener = PagedOpener({"fsrs_review": []})
+
+        SupabaseClient(config, opener=opener)._fetch_all(
+            "fsrs_review", "id", "id"
+        )
+
+        self.assertEqual(opener.requests[0].headers["Apikey"], secret)
+        self.assertEqual(opener.requests[0].headers["Authorization"], f"Bearer {secret}")
+
+    def test_configuration_accepts_only_server_secret_environment(self):
+        url = "https://example.supabase.co"
+        invalid_environments = (
+            {"SUPABASE_URL": url},
+            {"SUPABASE_KEY": "sb_secret_old-name"},
+            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": "sb_publishable_browser"},
+            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": legacy_jwt("anon")},
+        )
+        for environment in invalid_environments:
+            with self.subTest(environment=environment):
+                with self.assertRaises(ConfigurationError):
+                    SupabaseConfig.from_environment(environment)
+
+        secret_config = SupabaseConfig.from_environment(
+            {"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": "sb_secret_viewer-test"}
+        )
+        legacy_config = SupabaseConfig.from_environment(
+            {
+                "SUPABASE_URL": url,
+                "SUPABASE_SECRET_KEY": legacy_jwt("service_role"),
+            }
+        )
+        self.assertFalse(secret_config.legacy_service_role)
+        self.assertTrue(legacy_config.legacy_service_role)
 
     def test_http_surface_is_get_only_and_does_not_leak_errors(self):
         server = make_server("127.0.0.1", 0, snapshot_loader=sample_snapshot)
@@ -126,7 +309,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
                 self.assertEqual(response.status, 200)
                 body = response.read().decode("utf-8")
             self.assertIn("9007199254740993", body)
-            self.assertNotIn("anon-secret", body)
+            self.assertNotIn("sb_secret", body)
             request = urllib.request.Request(base + "/api/snapshot", method="POST")
             with self.assertRaises(urllib.error.HTTPError) as caught:
                 urllib.request.urlopen(request)
@@ -145,7 +328,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             thread.join()
 
     def test_http_error_is_generic(self):
-        secret = "anon-secret-value"
+        secret = "sb_secret_value"
 
         def failing_loader():
             raise UpstreamError(f"upstream included {secret}")
@@ -155,7 +338,9 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         thread.start()
         try:
             with self.assertRaises(urllib.error.HTTPError) as caught:
-                urllib.request.urlopen(f"http://127.0.0.1:{server.server_port}/api/snapshot")
+                urllib.request.urlopen(
+                    f"http://127.0.0.1:{server.server_port}/api/snapshot"
+                )
             self.assertEqual(caught.exception.code, 502)
             self.assertNotIn(secret, caught.exception.read().decode("utf-8"))
             caught.exception.close()
