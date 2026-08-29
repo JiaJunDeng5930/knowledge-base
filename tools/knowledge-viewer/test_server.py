@@ -71,6 +71,17 @@ class PagedOpener:
 
 
 class KnowledgeViewerServerTests(unittest.TestCase):
+    def test_normalize_accepts_unreviewed_fsrs(self):
+        snapshot = sample_snapshot()
+        snapshot["fsrs"] = [{
+            "id": "1", "stability_days": None, "difficulty": None,
+            "last_review_at": None, "due_at": "2026-08-28T00:00:00+00:00",
+        }]
+        result = normalize_snapshot(snapshot)["fsrs"][0]
+        self.assertIsNone(result["stability_days"])
+        self.assertIsNone(result["difficulty"])
+        self.assertIsNone(result["last_review_at"])
+
     def test_normalize_preserves_bigint_as_decimal_strings(self):
         result = normalize_snapshot(sample_snapshot())
         self.assertIsInstance(result["records"][0]["id"], str)

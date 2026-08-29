@@ -1,5 +1,6 @@
 tools/knowledge-viewer/.env
 tools/knowledge-viewer/.env.*
 !tools/knowledge-viewer/.env.example
+skills/knowledge-base/fsrs/.venv/
 __pycache__/
 *.py[cod]

@@ -71,6 +71,12 @@ def _finite_number(value: Any, *, field: str) -> float:
     return number
 
 
+def _optional_finite_number(value: Any, *, field: str) -> float | None:
+    if value is None:
+        return None
+    return _finite_number(value, field=field)
+
+
 def _integer(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise UpstreamError(f"invalid {field}")
@@ -145,14 +151,15 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
         fsrs.append(
             {
                 "id": _decimal_string(row.get("id"), field="fsrs id"),
-                "stability_days": _finite_number(
+                "stability_days": _optional_finite_number(
                     row.get("stability_days"), field="fsrs stability_days"
                 ),
-                "difficulty": _finite_number(
+                "difficulty": _optional_finite_number(
                     row.get("difficulty"), field="fsrs difficulty"
                 ),
-                "last_review_at": _text(
-                    row.get("last_review_at"), field="fsrs last_review_at"
+                "last_review_at": (
+                    None if row.get("last_review_at") is None
+                    else _text(row["last_review_at"], field="fsrs last_review_at")
                 ),
                 "due_at": _text(row.get("due_at"), field="fsrs due_at"),
             }

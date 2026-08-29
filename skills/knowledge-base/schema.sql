@@ -179,92 +179,90 @@ from inherited_tag;
 -- ============================================================
 -- 4. FSRS-6 对象
 --
--- 一条 fsrs 记录表示一个独立的间隔重复调度对象。
--- 它保存自己的 FSRS-6 当前状态。
---
--- FSRS 对象的粒度与知识记录的存储粒度相互独立。
--- 它需要哪些知识内容，由后面的 fsrs_knowledge 关系表达。
---
--- 当前 schema 只保存当前状态。
--- 历次复习及旧状态属于历史记录，不放在这里。
+-- 字段对应 py-fsrs Card；scheduler 保存 Scheduler.to_dict() 的完整配置。
+-- 尚未复习的对象具有有效的阶段与到期时间，记忆状态及最后复习时间为空。
+-- revision 用于库外计算后的条件写入，防止旧快照覆盖新状态。
 -- ============================================================
 
 create table public.fsrs (
     id bigint generated always as identity primary key,
-
-    -- FSRS-6 的 Stability。
-    -- 单位为天，表示记忆稳定性。
-    stability_days double precision not null
-        constraint fsrs_stability_valid
-        check (
-            stability_days > 0
-            and stability_days < 'Infinity'::double precision
-        ),
-
-    -- FSRS-6 的 Difficulty。
-    difficulty double precision not null
-        constraint fsrs_difficulty_valid
+    state smallint not null default 1
+        check (state in (1, 2, 3)),
+    step integer default 0,
+    stability_days double precision
+        check (stability_days > 0 and stability_days < 'Infinity'::double precision),
+    difficulty double precision
         check (difficulty between 1.0 and 10.0),
-
-    -- 当前 Stability 和 Difficulty 所对应的最后一次复习时间。
-    last_review_at timestamptz not null
-        constraint fsrs_last_review_finite
+    last_review_at timestamptz
         check (isfinite(last_review_at)),
-
-    -- 当前调度产生的下一次复习时间。
-    -- 保存这个结果可以直接查询已经到期的 FSRS 对象。
-    due_at timestamptz not null
-        constraint fsrs_due_valid
-        check (
-            isfinite(due_at)
-            and due_at >= last_review_at
-        )
+    due_at timestamptz not null default current_timestamp
+        check (isfinite(due_at) and due_at >= last_review_at),
+    scheduler jsonb not null,
+    revision bigint not null default 0
+        check (revision >= 0),
+    constraint fsrs_step_valid check (
+        (state = 2 and step is null)
+        or (state in (1, 3) and step is not null and step >= 0)
+    ),
+    constraint fsrs_memory_state_complete check (
+        (stability_days is null and difficulty is null and last_review_at is null)
+        or
+        (stability_days is not null and difficulty is not null and last_review_at is not null)
+    ),
+    constraint fsrs_scheduler_shape check (
+        jsonb_typeof(scheduler) = 'object'
+        and scheduler ?& array[
+            'parameters', 'desired_retention', 'learning_steps',
+            'relearning_steps', 'maximum_interval', 'enable_fuzzing'
+        ]
+        and jsonb_typeof(scheduler -> 'parameters') = 'array'
+        and jsonb_array_length(scheduler -> 'parameters') = 21
+        and jsonb_typeof(scheduler -> 'learning_steps') = 'array'
+        and jsonb_typeof(scheduler -> 'relearning_steps') = 'array'
+        and jsonb_typeof(scheduler -> 'desired_retention') = 'number'
+        and (scheduler ->> 'desired_retention')::double precision > 0
+        and (scheduler ->> 'desired_retention')::double precision <= 1
+        and jsonb_typeof(scheduler -> 'maximum_interval') = 'number'
+        and (scheduler ->> 'maximum_interval')::integer > 0
+        and jsonb_typeof(scheduler -> 'enable_fuzzing') = 'boolean'
+    )
 );
 
-
-create index fsrs_due_idx
-    on public.fsrs (due_at);
-
+create index fsrs_due_idx on public.fsrs (due_at);
 
 -- ============================================================
--- 5. FSRS 对象与知识记录的关联
---
--- 一个 FSRS 对象关联一条或多条知识记录。
--- 同一条知识记录也可以同时关联多个 FSRS 对象。
---
--- FSRS 当前状态只保存在 public.fsrs 中。
--- 这张表只回答某个 FSRS 在复习时需要取用哪些知识记录。
+-- 5. FSRS 对象与知识记录的多对多关联
 -- ============================================================
 
 create table public.fsrs_knowledge (
-    fsrs_id bigint not null
-        references public.fsrs (id),
-
-    record_id bigint not null
-        references public.knowledge_record (id),
-
-    -- 同一 FSRS 与同一知识记录之间只保存一次关联。
+    fsrs_id bigint not null references public.fsrs (id),
+    record_id bigint not null references public.knowledge_record (id),
     primary key (fsrs_id, record_id)
 );
 
-
--- 主键 (fsrs_id, record_id) 已经适合从一个 FSRS
--- 查询它关联的全部知识记录。
---
--- 这个反向索引适合从一条知识记录查询关联它的全部 FSRS。
 create index fsrs_knowledge_record_idx
-    on public.fsrs_knowledge (
-        record_id,
-        fsrs_id
-    );
+    on public.fsrs_knowledge (record_id, fsrs_id);
 
-
--- 已经确定的模型要求每个 FSRS 至少关联一条知识记录。
+-- ============================================================
+-- 6. 复习历史
 --
--- 普通 CHECK 和外键不能从 public.fsrs 的一行反向约束
--- public.fsrs_knowledge 中必须存在子行。
--- 为避免引入没有语义依据的“主要知识记录”字段或 trigger，
--- 创建 FSRS 时需要在同一事务中同时写入至少一条关联。
+-- 每行保存一次实际复习产生的 ReviewLog，供参数拟合和状态重算使用。
+-- 状态重算不产生新的复习观测；历史不通过当前状态的数值变化推测。
+-- ============================================================
+
+create table public.fsrs_review (
+    id bigint generated always as identity primary key,
+    fsrs_id bigint not null references public.fsrs (id),
+    rating smallint not null check (rating between 1 and 4),
+    review_datetime timestamptz not null check (isfinite(review_datetime)),
+    review_duration bigint check (review_duration >= 0)
+);
+
+create index fsrs_review_object_time_idx
+    on public.fsrs_review (fsrs_id, review_datetime, id);
+
+-- 历史通过已授权的 SQL 通道使用，Data API 访问需要相应的授权策略。
+alter table public.fsrs_review enable row level security;
 
 
 commit;

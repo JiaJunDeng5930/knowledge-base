@@ -312,9 +312,9 @@ function renderFsrsPanel(container, route, panelName) {
   const detail = element("section", "fsrs-detail");
   const fields = [
     ["id", fsrs.id],
-    ["Stability", `${fsrs.stability_days} 天`],
-    ["Difficulty", String(fsrs.difficulty)],
-    ["最后复习", fsrs.last_review_at],
+    ["Stability", fsrs.stability_days === null ? "尚未估计" : `${fsrs.stability_days} 天`],
+    ["Difficulty", fsrs.difficulty === null ? "尚未估计" : String(fsrs.difficulty)],
+    ["最后复习", fsrs.last_review_at === null ? "尚未复习" : fsrs.last_review_at],
     ["下次到期", fsrs.due_at],
   ];
   for (const [name, value] of fields) {
