@@ -66,16 +66,16 @@ end;
 $$;
 
 
-create trigger knowledge_record_row_change
-after insert or update or delete on public.knowledge_record
+create trigger bullet_row_change
+after insert or update or delete on public.bullet
 for each row execute function audit.record_row_change();
 
-create trigger knowledge_reference_row_change
-after insert or update or delete on public.knowledge_reference
+create trigger bullet_reference_row_change
+after insert or update or delete on public.bullet_reference
 for each row execute function audit.record_row_change();
 
-create trigger record_tag_row_change
-after insert or update or delete on public.record_tag
+create trigger bullet_tag_row_change
+after insert or update or delete on public.bullet_tag
 for each row execute function audit.record_row_change();
 
 create trigger scheduler_config_row_change
@@ -86,8 +86,8 @@ create trigger fsrs_row_change
 after insert or update or delete on public.fsrs
 for each row execute function audit.record_row_change();
 
-create trigger fsrs_knowledge_row_change
-after insert or update or delete on public.fsrs_knowledge
+create trigger fsrs_bullet_row_change
+after insert or update or delete on public.fsrs_bullet
 for each row execute function audit.record_row_change();
 
 create trigger fsrs_review_row_change

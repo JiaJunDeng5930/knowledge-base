@@ -16,9 +16,9 @@ tools/knowledge-viewer/run
 
 ## 固定读取边界
 
-服务只提供 `GET /api/snapshot`，由七个固定查询组成：`knowledge_record`、`knowledge_reference`、`effective_record_tag`、`scheduler_config`、`fsrs`、`fsrs_knowledge` 和 `fsrs_review`。FSRS 快照包含当前原生 Card 状态、共享 Scheduler 配置、知识关联和复习历史。每次查询持续使用分页读取至空页，返回 bigint 时保持十进制字符串。其他表、列、SQL 和写入方法没有对应端点；所有非 GET 方法返回 405。
+服务只提供 `GET /api/snapshot`，由七个固定查询组成：`bullet`、`bullet_reference`、`effective_bullet_tag`、`scheduler_config`、`fsrs`、`fsrs_bullet` 和 `fsrs_review`。FSRS 快照包含当前原生 Card 状态、共享 Scheduler 配置、知识关联和复习历史。每次查询持续使用分页读取至空页，返回 bigint 时保持十进制字符串。其他表、列、SQL 和写入方法没有对应端点；所有非 GET 方法返回 405。
 
-页面提供有序森林、记录级 zoom、面包屑、折叠、直接引用、反向链接、FSRS 关联、搜索和 Shift-click 右栏。正文使用文本节点显示，不解析 Markdown，也没有编辑、删除或调度修改能力。
+页面提供子弹笔记、bullet zoom、面包屑、折叠、直接引用、反向链接、FSRS 关联、搜索和 Shift-click 右栏。正文使用文本节点显示，不解析 Markdown，也没有编辑、删除或调度修改能力。
 
 远端 Supabase 项目通过 RLS 允许 `anon` 角色读取知识快照，不授予写入策略。本工具仍然只绑定 loopback，并且只暴露固定的只读 HTTP 接口。
 

@@ -133,28 +133,28 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
     """
 
     expected = (
-        "records",
+        "bullets",
         "references",
         "effective_tags",
         "fsrs",
-        "fsrs_knowledge",
+        "fsrs_bullet",
         "fsrs_review",
     )
     if not isinstance(raw, Mapping) or any(key not in raw for key in expected):
         raise UpstreamError("invalid snapshot")
 
-    records: list[dict[str, Any]] = []
-    for row in _rows(raw["records"], "records"):
-        records.append(
+    bullets: list[dict[str, Any]] = []
+    for row in _rows(raw["bullets"], "bullets"):
+        bullets.append(
             {
-                "id": _decimal_string(row.get("id"), field="record id"),
-                "body": _text(row.get("body"), field="record body"),
+                "id": _decimal_string(row.get("id"), field="bullet id"),
+                "body": _text(row.get("body"), field="bullet body"),
                 "parent_id": _optional_decimal_string(
-                    row.get("parent_id"), field="record parent_id"
+                    row.get("parent_id"), field="bullet parent_id"
                 ),
-                "depth": _integer(row.get("depth"), field="record depth"),
+                "depth": _integer(row.get("depth"), field="bullet depth"),
                 "sibling_order": _decimal_string(
-                    row.get("sibling_order"), field="record sibling_order"
+                    row.get("sibling_order"), field="bullet sibling_order"
                 ),
             }
         )
@@ -163,11 +163,11 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
     for row in _rows(raw["references"], "references"):
         references.append(
             {
-                "source_record_id": _decimal_string(
-                    row.get("source_record_id"), field="reference source_record_id"
+                "source_bullet_id": _decimal_string(
+                    row.get("source_bullet_id"), field="reference source_bullet_id"
                 ),
-                "target_record_id": _decimal_string(
-                    row.get("target_record_id"), field="reference target_record_id"
+                "target_bullet_id": _decimal_string(
+                    row.get("target_bullet_id"), field="reference target_bullet_id"
                 ),
             }
         )
@@ -176,8 +176,8 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
     for row in _rows(raw["effective_tags"], "effective_tags"):
         effective_tags.append(
             {
-                "record_id": _decimal_string(
-                    row.get("record_id"), field="tag record_id"
+                "bullet_id": _decimal_string(
+                    row.get("bullet_id"), field="tag bullet_id"
                 ),
                 "tag": _text(row.get("tag"), field="tag"),
             }
@@ -235,15 +235,15 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
             }
         )
 
-    fsrs_knowledge: list[dict[str, str]] = []
-    for row in _rows(raw["fsrs_knowledge"], "fsrs_knowledge"):
-        fsrs_knowledge.append(
+    fsrs_bullet: list[dict[str, str]] = []
+    for row in _rows(raw["fsrs_bullet"], "fsrs_bullet"):
+        fsrs_bullet.append(
             {
                 "fsrs_id": _decimal_string(
-                    row.get("fsrs_id"), field="fsrs_knowledge fsrs_id"
+                    row.get("fsrs_id"), field="fsrs_bullet fsrs_id"
                 ),
-                "record_id": _decimal_string(
-                    row.get("record_id"), field="fsrs_knowledge record_id"
+                "bullet_id": _decimal_string(
+                    row.get("bullet_id"), field="fsrs_bullet bullet_id"
                 ),
             }
         )
@@ -271,12 +271,12 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
         )
 
     return {
-        "records": records,
+        "bullets": bullets,
         "references": references,
         "effective_tags": effective_tags,
         "scheduler_configs": scheduler_configs,
         "fsrs": fsrs,
-        "fsrs_knowledge": fsrs_knowledge,
+        "fsrs_bullet": fsrs_bullet,
         "fsrs_review": fsrs_review,
     }
 
@@ -327,19 +327,19 @@ def _jwt_role(value: str) -> str | None:
 
 TABLES: tuple[tuple[str, str, str], ...] = (
     (
-        "knowledge_record",
+        "bullet",
         "id,body,parent_id,depth,sibling_order",
         "id",
     ),
     (
-        "knowledge_reference",
-        "source_record_id,target_record_id",
-        "source_record_id,target_record_id",
+        "bullet_reference",
+        "source_bullet_id,target_bullet_id",
+        "source_bullet_id,target_bullet_id",
     ),
     (
-        "effective_record_tag",
-        "record_id,tag",
-        "record_id,tag",
+        "effective_bullet_tag",
+        "bullet_id,tag",
+        "bullet_id,tag",
     ),
     (
         "scheduler_config",
@@ -352,9 +352,9 @@ TABLES: tuple[tuple[str, str, str], ...] = (
         "id",
     ),
     (
-        "fsrs_knowledge",
-        "fsrs_id,record_id",
-        "fsrs_id,record_id",
+        "fsrs_bullet",
+        "fsrs_id,bullet_id",
+        "fsrs_id,bullet_id",
     ),
     (
         "fsrs_review",
@@ -382,12 +382,12 @@ class SupabaseClient:
         raw: dict[str, list[Mapping[str, Any]]] = {}
         for table, select, order in TABLES:
             raw_key = {
-                "knowledge_record": "records",
-                "knowledge_reference": "references",
-                "effective_record_tag": "effective_tags",
+                "bullet": "bullets",
+                "bullet_reference": "references",
+                "effective_bullet_tag": "effective_tags",
                 "scheduler_config": "scheduler_configs",
                 "fsrs": "fsrs",
-                "fsrs_knowledge": "fsrs_knowledge",
+                "fsrs_bullet": "fsrs_bullet",
                 "fsrs_review": "fsrs_review",
             }[table]
             raw[raw_key] = self._fetch_all(table, select, order)
@@ -503,7 +503,7 @@ class KnowledgeViewerHandler(BaseHTTPRequestHandler):
         if path == "/api/snapshot":
             self._snapshot()
             return
-        if path in {"/", "/root"} or re.fullmatch(r"/record/-?[0-9]+", path) or re.fullmatch(r"/fsrs/-?[0-9]+", path):
+        if path in {"/", "/root"} or re.fullmatch(r"/bullet/-?[0-9]+", path) or re.fullmatch(r"/fsrs/-?[0-9]+", path):
             self._static("index.html", "text/html; charset=utf-8")
             return
         if path == "/app.js":

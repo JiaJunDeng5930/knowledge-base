@@ -18,7 +18,7 @@ export function compareBigintStrings(left, right) {
   return aNegative ? -result : result;
 }
 
-function compareRecords(left, right) {
+function compareBullets(left, right) {
   return (
     compareBigintStrings(left.sibling_order, right.sibling_order) ||
     compareBigintStrings(left.id, right.id)
@@ -38,19 +38,19 @@ export function summarize(body, maxLength = 72) {
 }
 
 export function buildKnowledgeModel(snapshot) {
-  const records = snapshot.records.map((record) => ({ ...record }));
-  const recordsById = new Map(records.map((record) => [record.id, record]));
+  const bullets = snapshot.bullets.map((bullet) => ({ ...bullet }));
+  const bulletsById = new Map(bullets.map((bullet) => [bullet.id, bullet]));
   const childrenByParent = new Map();
-  for (const record of records) {
-    pushMapArray(childrenByParent, record.parent_id, record);
+  for (const bullet of bullets) {
+    pushMapArray(childrenByParent, bullet.parent_id, bullet);
   }
-  for (const children of childrenByParent.values()) children.sort(compareRecords);
+  for (const children of childrenByParent.values()) children.sort(compareBullets);
 
   const outgoingById = new Map();
   const incomingById = new Map();
   for (const reference of snapshot.references) {
-    pushMapArray(outgoingById, reference.source_record_id, reference.target_record_id);
-    pushMapArray(incomingById, reference.target_record_id, reference.source_record_id);
+    pushMapArray(outgoingById, reference.source_bullet_id, reference.target_bullet_id);
+    pushMapArray(incomingById, reference.target_bullet_id, reference.source_bullet_id);
   }
   for (const references of outgoingById.values()) {
     references.sort(compareBigintStrings);
@@ -60,21 +60,21 @@ export function buildKnowledgeModel(snapshot) {
   }
 
   const tagsById = new Map();
-  for (const tag of snapshot.effective_tags) pushMapArray(tagsById, tag.record_id, tag.tag);
+  for (const tag of snapshot.effective_tags) pushMapArray(tagsById, tag.bullet_id, tag.tag);
   for (const tags of tagsById.values()) tags.sort((left, right) => left.localeCompare(right));
 
   const schedulerConfigsById = new Map(
     snapshot.scheduler_configs.map((item) => [item.id, { ...item }]),
   );
   const fsrsById = new Map(snapshot.fsrs.map((item) => [item.id, { ...item }]));
-  const recordsByFsrs = new Map();
-  const fsrsByRecord = new Map();
-  for (const relation of snapshot.fsrs_knowledge) {
-    pushMapArray(recordsByFsrs, relation.fsrs_id, relation.record_id);
-    pushMapArray(fsrsByRecord, relation.record_id, relation.fsrs_id);
+  const bulletsByFsrs = new Map();
+  const fsrsByBullet = new Map();
+  for (const relation of snapshot.fsrs_bullet) {
+    pushMapArray(bulletsByFsrs, relation.fsrs_id, relation.bullet_id);
+    pushMapArray(fsrsByBullet, relation.bullet_id, relation.fsrs_id);
   }
-  for (const ids of recordsByFsrs.values()) ids.sort(compareBigintStrings);
-  for (const ids of fsrsByRecord.values()) ids.sort(compareBigintStrings);
+  for (const ids of bulletsByFsrs.values()) ids.sort(compareBigintStrings);
+  for (const ids of fsrsByBullet.values()) ids.sort(compareBigintStrings);
 
   const reviewsByFsrs = new Map();
   for (const review of snapshot.fsrs_review) {
@@ -91,17 +91,17 @@ export function buildKnowledgeModel(snapshot) {
     return childrenByParent.get(parentId) || [];
   }
 
-  function getPath(recordId) {
+  function getPath(bulletId) {
     const path = [{ id: null, label: "root" }];
     const lineage = [];
     const seen = new Set();
-    let currentId = recordId;
+    let currentId = bulletId;
     while (currentId !== null && !seen.has(currentId)) {
       seen.add(currentId);
-      const record = recordsById.get(currentId);
-      if (!record) break;
-      lineage.push({ id: record.id, label: summarize(record.body) });
-      currentId = record.parent_id;
+      const bullet = bulletsById.get(currentId);
+      if (!bullet) break;
+      lineage.push({ id: bullet.id, label: summarize(bullet.body) });
+      currentId = bullet.parent_id;
     }
     path.push(...lineage.reverse());
     return path;
@@ -110,21 +110,21 @@ export function buildKnowledgeModel(snapshot) {
   function search(query) {
     const needle = String(query).toLowerCase();
     if (!needle) return [];
-    return records.filter((record) => record.body.toLowerCase().includes(needle));
+    return bullets.filter((bullet) => bullet.body.toLowerCase().includes(needle));
   }
 
   return {
-    records,
-    recordsById,
+    bullets,
+    bulletsById,
     childrenByParent,
-    rootRecords: getChildren(null),
+    rootBullets: getChildren(null),
     outgoingById,
     incomingById,
     tagsById,
     schedulerConfigsById,
     fsrsById,
-    recordsByFsrs,
-    fsrsByRecord,
+    bulletsByFsrs,
+    fsrsByBullet,
     reviewsByFsrs,
     getChildren,
     getPath,

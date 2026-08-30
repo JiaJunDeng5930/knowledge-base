@@ -42,8 +42,8 @@ function element(tag, className, text = null) {
 function parseRoute(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/" || path === "/root") return { kind: "root" };
-  const record = path.match(/^\/record\/(-?[0-9]+)$/);
-  if (record) return { kind: "record", id: record[1] };
+  const bullet = path.match(/^\/bullet\/(-?[0-9]+)$/);
+  if (bullet) return { kind: "bullet", id: bullet[1] };
   const fsrs = path.match(/^\/fsrs\/(-?[0-9]+)$/);
   if (fsrs) return { kind: "fsrs", id: fsrs[1] };
   return { kind: "unknown" };
@@ -51,7 +51,7 @@ function parseRoute(pathname) {
 
 function routePath(route) {
   if (route.kind === "root") return "/root";
-  if (route.kind === "record") return `/record/${encodeURIComponent(route.id)}`;
+  if (route.kind === "bullet") return `/bullet/${encodeURIComponent(route.id)}`;
   if (route.kind === "fsrs") return `/fsrs/${encodeURIComponent(route.id)}`;
   return "/root";
 }
@@ -92,7 +92,7 @@ function appendBreadcrumb(container, route, panelName) {
     container.append(element("span", "breadcrumb-label", route.id));
     return;
   }
-  const trail = route.kind === "record" && state.model
+  const trail = route.kind === "bullet" && state.model
     ? state.model.getPath(route.id)
     : [{ id: null, label: "root" }];
   trail.forEach((part, index) => {
@@ -102,7 +102,7 @@ function appendBreadcrumb(container, route, panelName) {
     if (part.id === null) {
       link.addEventListener("click", () => openRoute({ kind: "root" }, panelName));
     } else {
-      link.addEventListener("click", () => openRoute({ kind: "record", id: part.id }, panelName));
+      link.addEventListener("click", () => openRoute({ kind: "bullet", id: part.id }, panelName));
     }
     container.append(link);
   });
@@ -127,30 +127,30 @@ function renderPanelHeader(panelName, route) {
 
   const title = element("h1", "panel-title");
   if (route.kind === "root") title.textContent = "知识库根目录";
-  else if (route.kind === "record") {
-    const record = state.model.recordsById.get(route.id);
-    title.textContent = record ? record.body : `记录 ${route.id}`;
+  else if (route.kind === "bullet") {
+    const bullet = state.model.bulletsById.get(route.id);
+    title.textContent = bullet ? bullet.body : `bullet ${route.id}`;
   } else if (route.kind === "fsrs") title.textContent = `FSRS ${route.id}`;
   else title.textContent = "未知路径";
   header.append(title);
 
   const hint = element("p", "panel-hint");
-  if (route.kind === "root") hint.textContent = "有序森林的根节点";
-  else if (route.kind === "record") hint.textContent = "记录正文保持原样显示；点击正文可 zoom。";
-  else if (route.kind === "fsrs") hint.textContent = "只读调度状态与关联知识记录";
+  if (route.kind === "root") hint.textContent = "子弹笔记的根 bullet";
+  else if (route.kind === "bullet") hint.textContent = "bullet 正文保持原样显示；点击正文可 zoom。";
+  else if (route.kind === "fsrs") hint.textContent = "只读调度状态与关联 bullet";
   header.append(hint);
   return header;
 }
 
-function renderMetaPopover(item, record) {
-  const popover = element("div", "record-popover");
+function renderMetaPopover(item, bullet) {
+  const popover = element("div", "bullet-popover");
   const details = [
-    ["id", record.id],
-    ["parent_id", record.parent_id === null ? "null" : record.parent_id],
-    ["depth", String(record.depth)],
-    ["sibling_order", record.sibling_order],
-    ["子节点", String(state.model.getChildren(record.id).length)],
-    ["父链", state.model.getPath(record.id).map((part) => part.label).join(" / ")],
+    ["id", bullet.id],
+    ["parent_id", bullet.parent_id === null ? "null" : bullet.parent_id],
+    ["depth", String(bullet.depth)],
+    ["sibling_order", bullet.sibling_order],
+    ["子节点", String(state.model.getChildren(bullet.id).length)],
+    ["父链", state.model.getPath(bullet.id).map((part) => part.label).join(" / ")],
   ];
   for (const [name, value] of details) {
     const line = element("div", "meta-line");
@@ -161,33 +161,33 @@ function renderMetaPopover(item, record) {
   item.append(popover);
 }
 
-function recordLink(record, panelName, className = "preview-link", label = summarize(record.body)) {
+function bulletLink(bullet, panelName, className = "preview-link", label = summarize(bullet.body)) {
   const link = element("button", className, label);
   link.type = "button";
-  link.dataset.recordId = record.id;
+  link.dataset.bulletId = bullet.id;
   link.addEventListener("click", (event) => {
-    if (event.shiftKey) openRoute({ kind: "record", id: record.id }, "right");
-    else openRoute({ kind: "record", id: record.id }, panelName);
+    if (event.shiftKey) openRoute({ kind: "bullet", id: bullet.id }, "right");
+    else openRoute({ kind: "bullet", id: bullet.id }, panelName);
   });
   return link;
 }
 
-function relationKey(panelName, recordId, kind) {
-  return `${panelName}:${recordId}:${kind}`;
+function relationKey(panelName, bulletId, kind) {
+  return `${panelName}:${bulletId}:${kind}`;
 }
 
-function renderRelated(item, record, panelName, kind, ids) {
+function renderRelated(item, bullet, panelName, kind, ids) {
   if (!ids.length) return;
-  const key = relationKey(panelName, record.id, kind);
+  const key = relationKey(panelName, bullet.id, kind);
   if (!state.openRelations.has(key)) return;
   const section = element("section", "related-preview");
   section.append(element("h4", "related-title", kind === "outgoing" ? "直接引用" : "反向链接"));
   const list = element("div", "preview-list");
   for (const id of ids) {
-    const target = state.model.recordsById.get(id);
+    const target = state.model.bulletsById.get(id);
     if (!target) continue;
     const card = element("div", "preview-card");
-    card.append(recordLink(target, panelName));
+    card.append(bulletLink(target, panelName));
     card.append(element("span", "preview-id", `#${target.id}`));
     list.append(card);
   }
@@ -195,12 +195,12 @@ function renderRelated(item, record, panelName, kind, ids) {
   item.append(section);
 }
 
-function renderRecordNode(parent, record, panelName) {
-  const item = element("article", "record-item");
-  item.dataset.recordId = record.id;
-  const children = state.model.getChildren(record.id);
-  const expanded = panelState(panelName).has(record.id);
-  const row = element("div", "record-row");
+function renderBulletNode(parent, bullet, panelName) {
+  const item = element("article", "bullet-item");
+  item.dataset.bulletId = bullet.id;
+  const children = state.model.getChildren(bullet.id);
+  const expanded = panelState(panelName).has(bullet.id);
+  const row = element("div", "bullet-row");
 
   const caret = element("button", children.length ? "caret" : "bullet", children.length ? (expanded ? "⌄" : "›") : "•");
   caret.type = "button";
@@ -210,38 +210,38 @@ function renderRecordNode(parent, record, panelName) {
   if (children.length) {
     caret.addEventListener("click", () => {
       const expandedSet = panelState(panelName);
-      if (expandedSet.has(record.id)) expandedSet.delete(record.id);
-      else expandedSet.add(record.id);
+      if (expandedSet.has(bullet.id)) expandedSet.delete(bullet.id);
+      else expandedSet.add(bullet.id);
       render();
     });
   }
-  const marker = element("span", "record-marker");
+  const marker = element("span", "bullet-marker");
   marker.append(caret);
-  renderMetaPopover(marker, record);
+  renderMetaPopover(marker, bullet);
   row.append(marker);
 
-  const body = recordLink(record, panelName, "record-body", record.body);
+  const body = bulletLink(bullet, panelName, "bullet-body", bullet.body);
   body.title = "点击 zoom；Shift-click 在右栏打开";
   row.append(body);
 
-  const tags = state.model.tagsById.get(record.id) || [];
+  const tags = state.model.tagsById.get(bullet.id) || [];
   if (tags.length) {
     const tagList = element("span", "tag-list");
     for (const tag of tags) tagList.append(element("span", "tag", tag));
     row.append(tagList);
   }
 
-  const counts = element("div", "record-counts");
-  const outgoing = state.model.outgoingById.get(record.id) || [];
-  const incoming = state.model.incomingById.get(record.id) || [];
+  const counts = element("div", "bullet-counts");
+  const outgoing = state.model.outgoingById.get(bullet.id) || [];
+  const incoming = state.model.incomingById.get(bullet.id) || [];
   for (const [kind, ids, label] of [["outgoing", outgoing, "引用"], ["incoming", incoming, "反向链接"]]) {
     if (!ids.length) continue;
     const button = element("button", "count-button", `${label} ${ids.length}`);
     button.type = "button";
-    button.title = "展开直接记录预览";
+    button.title = "展开直接 bullet 预览";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      const key = relationKey(panelName, record.id, kind);
+      const key = relationKey(panelName, bullet.id, kind);
       if (state.openRelations.has(key)) state.openRelations.delete(key);
       else state.openRelations.add(key);
       render();
@@ -251,34 +251,34 @@ function renderRecordNode(parent, record, panelName) {
   row.append(counts);
   item.append(row);
   if (expanded) {
-    const list = element("div", "record-children");
-    for (const child of children) renderRecordNode(list, child, panelName);
+    const list = element("div", "bullet-children");
+    for (const child of children) renderBulletNode(list, child, panelName);
     item.append(list);
   }
-  renderRelated(item, record, panelName, "outgoing", outgoing);
-  renderRelated(item, record, panelName, "incoming", incoming);
+  renderRelated(item, bullet, panelName, "outgoing", outgoing);
+  renderRelated(item, bullet, panelName, "incoming", incoming);
   parent.append(item);
 }
 
-function renderRecordReferences(container, record, panelName) {
+function renderBulletReferences(container, bullet, panelName) {
   const section = element("section", "references-section");
-  section.append(element("h2", "section-title", "当前记录的直接关系"));
-  const outgoing = state.model.outgoingById.get(record.id) || [];
-  const incoming = state.model.incomingById.get(record.id) || [];
+  section.append(element("h2", "section-title", "当前 bullet 的直接引用"));
+  const outgoing = state.model.outgoingById.get(bullet.id) || [];
+  const incoming = state.model.incomingById.get(bullet.id) || [];
   for (const [kind, ids, title] of [["outgoing", outgoing, "直接引用"], ["incoming", incoming, "反向链接"]]) {
     const group = element("div", "reference-group");
     group.append(element("h3", "reference-title", `${title}（${ids.length}）`));
     if (!ids.length) {
-      group.append(element("p", "empty-copy", "没有直接记录关系。"));
+      group.append(element("p", "empty-copy", "没有直接 bullet 引用。"));
       section.append(group);
       continue;
     }
     const list = element("div", "preview-list");
     for (const id of ids) {
-      const target = state.model.recordsById.get(id);
+      const target = state.model.bulletsById.get(id);
       if (!target) continue;
       const card = element("div", "preview-card");
-      card.append(recordLink(target, panelName));
+      card.append(bulletLink(target, panelName));
       card.append(element("span", "preview-id", `#${target.id}`));
       list.append(card);
     }
@@ -290,23 +290,23 @@ function renderRecordReferences(container, record, panelName) {
 
 function renderTreePanel(container, route, panelName) {
   const list = element("div", "outline");
-  const focusedRecord = route.kind === "record" ? state.model.recordsById.get(route.id) : null;
-  const roots = route.kind === "record"
-    ? (focusedRecord ? state.model.getChildren(focusedRecord.id) : [])
-    : state.model.rootRecords;
+  const focusedBullet = route.kind === "bullet" ? state.model.bulletsById.get(route.id) : null;
+  const roots = route.kind === "bullet"
+    ? (focusedBullet ? state.model.getChildren(focusedBullet.id) : [])
+    : state.model.rootBullets;
   if (!roots.length) {
     const empty = element("div", "empty-state");
-    const missingRecord = route.kind === "record" && !focusedRecord;
-    empty.append(element("span", "empty-mark", missingRecord ? "?" : "∅"));
-    empty.append(element("h2", "empty-title", missingRecord ? "记录不存在" : route.kind === "record" ? "没有子节点" : "根目录为空"));
-    empty.append(element("p", "empty-copy", missingRecord ? "该记录不在当前知识库快照中。" : route.kind === "record" ? "当前记录没有直接子节点。" : "当前快照没有知识记录。"));
+    const missingBullet = route.kind === "bullet" && !focusedBullet;
+    empty.append(element("span", "empty-mark", missingBullet ? "?" : "∅"));
+    empty.append(element("h2", "empty-title", missingBullet ? "bullet 不存在" : route.kind === "bullet" ? "没有子节点" : "根目录为空"));
+    empty.append(element("p", "empty-copy", missingBullet ? "该 bullet 不在当前知识库快照中。" : route.kind === "bullet" ? "当前 bullet 没有直接子节点。" : "当前快照没有 bullet。"));
     list.append(empty);
   } else {
-    for (const record of roots) renderRecordNode(list, record, panelName);
+    for (const bullet of roots) renderBulletNode(list, bullet, panelName);
   }
   container.append(list);
-  if (route.kind === "record" && state.model.recordsById.has(route.id)) {
-    renderRecordReferences(container, state.model.recordsById.get(route.id), panelName);
+  if (route.kind === "bullet" && state.model.bulletsById.has(route.id)) {
+    renderBulletReferences(container, state.model.bulletsById.get(route.id), panelName);
   }
 }
 
@@ -381,14 +381,14 @@ function renderFsrsPanel(container, route, panelName) {
   }
   container.append(history);
 
-  const relationIds = state.model.recordsByFsrs.get(fsrs.id) || [];
+  const relationIds = state.model.bulletsByFsrs.get(fsrs.id) || [];
   const linked = element("section", "fsrs-links");
   const linkedHeader = element("div", "fsrs-links-header");
   const fsrsKey = `fsrs:${fsrs.id}`;
   const expanded = panelState(panelName).has(fsrsKey);
   const caret = element("button", relationIds.length ? "caret" : "bullet", relationIds.length ? (expanded ? "⌄" : "›") : "•");
   caret.type = "button";
-  caret.setAttribute("aria-label", relationIds.length ? (expanded ? "折叠关联记录" : "展开关联记录") : "没有关联记录");
+  caret.setAttribute("aria-label", relationIds.length ? (expanded ? "折叠关联 bullet" : "展开关联 bullet") : "没有关联 bullet");
   caret.setAttribute("aria-expanded", relationIds.length ? String(expanded) : "false");
   caret.disabled = !relationIds.length;
   if (relationIds.length) {
@@ -400,16 +400,16 @@ function renderFsrsPanel(container, route, panelName) {
     });
   }
   linkedHeader.append(caret);
-  linkedHeader.append(element("h2", "section-title", `关联知识记录（${relationIds.length}）`));
+  linkedHeader.append(element("h2", "section-title", `关联 bullet（${relationIds.length}）`));
   linked.append(linkedHeader);
   if (!relationIds.length) {
-    linked.append(element("p", "empty-copy", "该 FSRS 对象没有关联知识记录。"));
+    linked.append(element("p", "empty-copy", "该 FSRS 对象没有关联 bullet。"));
   } else if (expanded) {
-    const list = element("div", "outline fsrs-records");
+    const list = element("div", "outline fsrs-bullets");
     for (const id of relationIds) {
-      const record = state.model.recordsById.get(id);
-      if (!record) continue;
-      renderRecordNode(list, record, panelName);
+      const bullet = state.model.bulletsById.get(id);
+      if (!bullet) continue;
+      renderBulletNode(list, bullet, panelName);
     }
     linked.append(list);
   }
@@ -424,7 +424,7 @@ function renderPanel(panelName) {
     const empty = element("div", "context-empty");
     empty.append(element("span", "context-empty-mark", "↗"));
     empty.append(element("h2", null, "右栏上下文"));
-    empty.append(element("p", null, "按住 Shift 点击记录，在这里打开第二个只读上下文。"));
+    empty.append(element("p", null, "按住 Shift 点击 bullet，在这里打开第二个只读上下文。"));
     panel.append(empty);
     return;
   }
@@ -454,18 +454,18 @@ function renderSearch() {
   header.append(element("span", "search-help", "Enter 打开第一条；Shift-Enter 在右栏打开"));
   searchResults.append(header);
   if (!results.length) {
-    searchResults.append(element("p", "search-empty", "没有匹配的知识记录。"));
+    searchResults.append(element("p", "search-empty", "没有匹配的 bullet。"));
     return;
   }
   const list = element("div", "search-result-list");
-  for (const record of results) {
+  for (const bullet of results) {
     const item = element("article", "search-result");
-    const link = recordLink(record, "main", "search-result-body");
+    const link = bulletLink(bullet, "main", "search-result-body");
     item.append(link);
     const metadata = element("div", "search-result-meta");
-    metadata.append(element("span", null, `#${record.id}`));
-    metadata.append(element("span", null, state.model.getPath(record.id).map((part) => part.label).join(" / ")));
-    metadata.append(element("span", null, `引用 ${ (state.model.outgoingById.get(record.id) || []).length }`));
+    metadata.append(element("span", null, `#${bullet.id}`));
+    metadata.append(element("span", null, state.model.getPath(bullet.id).map((part) => part.label).join(" / ")));
+    metadata.append(element("span", null, `引用 ${ (state.model.outgoingById.get(bullet.id) || []).length }`));
     item.append(metadata);
     list.append(item);
   }
@@ -473,33 +473,33 @@ function renderSearch() {
 }
 
 function render() {
-  document.title = state.mainRoute.kind === "record" && state.model?.recordsById.has(state.mainRoute.id)
-    ? state.model.recordsById.get(state.mainRoute.id).body
+  document.title = state.mainRoute.kind === "bullet" && state.model?.bulletsById.has(state.mainRoute.id)
+    ? state.model.bulletsById.get(state.mainRoute.id).body
     : "Knowledge Viewer";
   renderPanel("main");
   renderPanel("right");
   renderSearch();
 }
 
-function currentFocusedRecordId() {
-  const active = document.activeElement?.closest?.("[data-record-id]");
-  return active?.dataset.recordId || null;
+function currentFocusedBulletId() {
+  const active = document.activeElement?.closest?.("[data-bullet-id]");
+  return active?.dataset.bulletId || null;
 }
 
 function zoomIn() {
   if (!state.model) return;
-  const id = currentFocusedRecordId();
-  if (!id || !state.model.recordsById.has(id)) return;
-  openRoute({ kind: "record", id }, "main");
+  const id = currentFocusedBulletId();
+  if (!id || !state.model.bulletsById.has(id)) return;
+  openRoute({ kind: "bullet", id }, "main");
 }
 
 function zoomOut() {
   if (!state.model) return;
-  if (!currentFocusedRecordId()) return;
-  if (state.mainRoute.kind !== "record") return;
-  const record = state.model.recordsById.get(state.mainRoute.id);
-  if (!record) return;
-  openRoute(record.parent_id === null ? { kind: "root" } : { kind: "record", id: record.parent_id }, "main");
+  if (!currentFocusedBulletId()) return;
+  if (state.mainRoute.kind !== "bullet") return;
+  const bullet = state.model.bulletsById.get(state.mainRoute.id);
+  if (!bullet) return;
+  openRoute(bullet.parent_id === null ? { kind: "root" } : { kind: "bullet", id: bullet.parent_id }, "main");
 }
 
 window.addEventListener("popstate", () => {
@@ -522,7 +522,7 @@ searchInput.addEventListener("keydown", (event) => {
   const results = state.model?.search(searchInput.value) || [];
   if (!results.length) return;
   event.preventDefault();
-  openRoute({ kind: "record", id: results[0].id }, event.shiftKey ? "right" : "main");
+  openRoute({ kind: "bullet", id: results[0].id }, event.shiftKey ? "right" : "main");
 });
 
 window.addEventListener("keydown", (event) => {

@@ -175,20 +175,20 @@ class FsrsDatabaseTests(unittest.TestCase):
         return self.query_file("read-fsrs-snapshot.sql", fsrs_id)[0]
 
     def test_review_history_and_atomic_saves(self):
-        record = self.query(
-            "insert into public.knowledge_record (body, depth, sibling_order) "
+        bullet = self.query(
+            "insert into public.bullet (body, depth, sibling_order) "
             "values ('测试知识', 0, 0) returning id"
         )
         scheduler_config_id = self.query_file(
             "create-scheduler-config.sql", self.Jsonb(scheduler_config())
         )[0]
         fsrs_id = self.query_file("create-fsrs.sql", self.Jsonb({
-            "record_ids": [record],
+            "bullet_ids": [bullet],
             "scheduler_config_id": scheduler_config_id,
             "due_at": "2026-01-01T00:00:00+00:00",
         }))[0]
         shared_fsrs_id = self.query_file("create-fsrs.sql", self.Jsonb({
-            "record_ids": [record],
+            "bullet_ids": [bullet],
             "scheduler_config_id": scheduler_config_id,
             "due_at": "2026-01-01T00:00:00+00:00",
         }))[0]
@@ -238,20 +238,20 @@ class FsrsDatabaseTests(unittest.TestCase):
         self.assertEqual(rescheduled["scheduler"]["desired_retention"], 0.95)
         self.assertEqual(self.query("select count(*) from public.fsrs_review"), 1)
 
-        with self.assertRaises(Exception) as missing_record:
+        with self.assertRaises(Exception) as missing_bullet:
             self.query_file("create-fsrs.sql", self.Jsonb({
-                "record_ids": [record + 1],
+                "bullet_ids": [bullet + 1],
                 "scheduler_config_id": scheduler_config_id,
             }))
-        self.assertEqual(missing_record.exception.sqlstate, "23503")
+        self.assertEqual(missing_bullet.exception.sqlstate, "23503")
         with self.assertRaises(Exception) as missing_config:
             self.query_file("create-fsrs.sql", self.Jsonb({
-                "record_ids": [record],
+                "bullet_ids": [bullet],
                 "scheduler_config_id": replacement_config_id + 1,
             }))
         self.assertEqual(missing_config.exception.sqlstate, "23503")
         self.assertIsNone(self.query_file("create-fsrs.sql", self.Jsonb({
-            "record_ids": [], "scheduler_config_id": scheduler_config_id,
+            "bullet_ids": [], "scheduler_config_id": scheduler_config_id,
         })))
         self.assertEqual(self.query("select count(*) from public.fsrs"), 2)
 

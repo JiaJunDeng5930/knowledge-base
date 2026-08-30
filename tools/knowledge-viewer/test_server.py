@@ -24,7 +24,7 @@ from server import (  # noqa: E402
 
 def sample_snapshot():
     return {
-        "records": [
+        "bullets": [
             {
                 "id": "9007199254740993",
                 "body": "large id",
@@ -39,7 +39,7 @@ def sample_snapshot():
             {"id": "1", "scheduler": {"desired_retention": 0.9}}
         ],
         "fsrs": [],
-        "fsrs_knowledge": [],
+        "fsrs_bullet": [],
         "fsrs_review": [],
     }
 
@@ -154,8 +154,8 @@ class KnowledgeViewerServerTests(unittest.TestCase):
 
         result = normalize_snapshot(snapshot)
 
-        self.assertEqual(result["records"][0]["id"], "9007199254740993")
-        self.assertEqual(result["records"][0]["sibling_order"], "-2")
+        self.assertEqual(result["bullets"][0]["id"], "9007199254740993")
+        self.assertEqual(result["bullets"][0]["sibling_order"], "-2")
         self.assertEqual(result["scheduler_configs"][0]["id"], "9007199254740994")
         self.assertEqual(result["fsrs"][0]["id"], "3")
         self.assertEqual(result["fsrs"][0]["scheduler_config_id"], "9007199254740994")
@@ -210,7 +210,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
 
     def test_client_runs_seven_queries_and_reads_until_empty_page(self):
         rows = {
-            "knowledge_record": [
+            "bullet": [
                 {
                     "id": str(index),
                     "body": str(index),
@@ -220,11 +220,11 @@ class KnowledgeViewerServerTests(unittest.TestCase):
                 }
                 for index in range(1, 4)
             ],
-            "knowledge_reference": [],
-            "effective_record_tag": [],
+            "bullet_reference": [],
+            "effective_bullet_tag": [],
             "scheduler_config": [],
             "fsrs": [],
-            "fsrs_knowledge": [],
+            "fsrs_bullet": [],
             "fsrs_review": [],
         }
         opener = PagedOpener(rows)
@@ -238,7 +238,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
 
         result = client.fetch_snapshot()
 
-        self.assertEqual([row["id"] for row in result["records"]], ["1", "2", "3"])
+        self.assertEqual([row["id"] for row in result["bullets"]], ["1", "2", "3"])
         requested_tables = {
             urllib.parse.urlsplit(request.full_url).path.rsplit("/", 1)[-1]
             for request in opener.requests
@@ -266,23 +266,23 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             review_query["select"][0],
             "id,fsrs_id,rating,review_datetime,review_duration",
         )
-        record_requests = [
+        bullet_requests = [
             request
             for request in opener.requests
-            if "/knowledge_record?" in request.full_url
+            if "/bullet?" in request.full_url
         ]
         offsets = [
             urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)[
                 "offset"
             ][0]
-            for request in record_requests
+            for request in bullet_requests
         ]
         self.assertEqual(offsets, ["0", "2", "3"])
-        self.assertEqual(record_requests[0].get_method(), "GET")
+        self.assertEqual(bullet_requests[0].get_method(), "GET")
         self.assertEqual(
-            record_requests[0].headers["Apikey"], "sb_publishable_viewer-test"
+            bullet_requests[0].headers["Apikey"], "sb_publishable_viewer-test"
         )
-        self.assertNotIn("Authorization", record_requests[0].headers)
+        self.assertNotIn("Authorization", bullet_requests[0].headers)
 
     def test_legacy_anon_is_sent_as_apikey_and_bearer(self):
         key = legacy_jwt("anon")
@@ -345,7 +345,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             with urllib.request.urlopen(base + "/") as response:
                 self.assertEqual(response.status, 200)
                 self.assertIn("Knowledge Viewer", response.read().decode("utf-8"))
-            with urllib.request.urlopen(base + "/record/-2") as response:
+            with urllib.request.urlopen(base + "/bullet/-2") as response:
                 self.assertEqual(response.status, 200)
             with urllib.request.urlopen(base + "/fsrs/-2") as response:
                 self.assertEqual(response.status, 200)

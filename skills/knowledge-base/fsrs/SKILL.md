@@ -17,10 +17,10 @@ FSRS（Free Spaced Repetition Scheduler）根据带时间的复习评分估计�
 | --- | --- |
 | `scheduler_config` | 完整的原生 Scheduler 配置；一条配置可以供多个 FSRS 对象使用。 |
 | `fsrs` | 每个对象的当前 Card 状态及其 `scheduler_config_id`。 |
-| `fsrs_knowledge` | FSRS 对象与知识记录的多对多关联。每个对象至少关联一条知识记录。 |
+| `fsrs_bullet` | FSRS 对象与 bullet 的多对多关联。每个对象至少关联一个 bullet。 |
 | `fsrs_review` | 每次复习的原生 ReviewLog 数据。优化器从这些历史数据重建各对象的记忆变化。 |
 
-对象的 `id` 对应 py-fsrs 的 `card_id`。对象的粒度由所需的记忆状态决定；一个对象可以关联多条知识记录，一条知识记录也可以供多个对象使用。多个对象可以通过同一个 `scheduler_config_id` 共用配置。
+对象的 `id` 对应 py-fsrs 的 `card_id`。对象的粒度由所需的记忆状态决定；一个对象可以关联多个 bullet，一个 bullet 也可以供多个对象使用。多个对象可以通过同一个 `scheduler_config_id` 共用配置。
 
 Card 的 `state` 使用上游的完整状态集合：
 
@@ -120,7 +120,7 @@ agent 通过当前任务已配置且已授权的数据库接口读取数据，�
 | 查询资料 | 参数 | 返回值 |
 | --- | --- | --- |
 | [create-scheduler-config.sql](queries/create-scheduler-config.sql) | 完整 Scheduler 配置 JSON；配置可用 `settings` 取得。 | 新配置的 `id`。 |
-| [create-fsrs.sql](queries/create-fsrs.sql) | 包含 `record_ids` 与 `scheduler_config_id` 的 JSON；可选 `due_at`。 | 新对象的 `id`；对象与知识关联在同一语句中建立。 |
+| [create-fsrs.sql](queries/create-fsrs.sql) | 包含 `bullet_ids` 与 `scheduler_config_id` 的 JSON；可选 `due_at`。 | 新对象的 `id`；对象与知识关联在同一语句中建立。 |
 | [read-fsrs-snapshot.sql](queries/read-fsrs-snapshot.sql) | 对象 id。 | Python 所需的 `snapshot`。 |
 | [read-fsrs-review-logs.sql](queries/read-fsrs-review-logs.sql) | 对象 id 数组。 | 按事件时间排序的 `review_logs`。 |
 | [save-fsrs-review.sql](queries/save-fsrs-review.sql) | `review` 命令的完整输出 JSON。 | 已保存对象的 `id`。 |
