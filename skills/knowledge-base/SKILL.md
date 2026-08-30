@@ -9,7 +9,9 @@ description: 在需要读取或维护个人知识库时使用。指导模型按�
 
 ## 数据定义与按需资料
 
-数据库的唯一权威定义是本目录的 [schema.sql](schema.sql)。需要确认字段或约束，以及编写 SQL 时，读取该文件。数据库结构变更以该文件为维护入口。
+当前知识模型的唯一权威定义是本目录的 [schema.sql](schema.sql)。需要确认字段或约束，以及编写 SQL 时，读取该文件。知识模型的数据库结构变更以该文件为维护入口。
+
+[change-history.sql](change-history.sql) 定义独立于当前知识模型的行级变更历史。该文件在 `schema.sql` 之后安装，覆盖全部持久化业务表。
 
 涉及 FSRS 数据或计算时，读取 [FSRS 子 skill](fsrs/SKILL.md)。该模块解释完整的 FSRS 数据与参数，并说明 agent 如何在计算脚本与数据库接口之间传递数据。
 
@@ -93,5 +95,13 @@ order by sibling_order;
 移动子树时，依据新位置调整整棵子树的深度。将节点的父关系变更与必要的深度调整放在同一事务中，使提交后的结构满足 schema。调整同级顺序时，同样利用事务完成整体修改；顺序值只表示先后，不要求连续。
 
 删除记录前，读取相关的结构依赖，并按当前任务明确的删除范围处理。涉及 FSRS 关联时，按需读取 FSRS 子 skill，保持对应的数据约束。
+
+### 变更历史与恢复
+
+安装 `change-history.sql` 后，业务表中已经提交的 `INSERT`、`UPDATE` 和 `DELETE` 会自动写入 `audit.row_change`。同一事务产生的记录拥有相同的 `transaction_id`；`id` 表示事务内的变更顺序。`old_row` 与 `new_row` 保存对应行在变更前后的完整 JSONB 快照。
+
+发现误操作时，先按 `transaction_id` 读取全部相关记录，并依据当前 schema 在一个事务中生成逆向数据操作。恢复操作本身继续形成新的变更历史；不要修改或删除原历史记录。
+
+Supabase 插件通过 `postgres` 访问数据库，因此 `audit` schema 只隔离数据用途，不限制插件。行级历史处理普通数据误操作；项目外数据库导出处理 `TRUNCATE`、DDL、trigger 或历史表本身被错误修改的情况。
 
 修改本 skill 时，先读取 [DECISIONS.md](DECISIONS.md) 中的用户决策。
