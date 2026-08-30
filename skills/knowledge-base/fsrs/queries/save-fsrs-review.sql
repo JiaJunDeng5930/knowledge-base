@@ -9,20 +9,13 @@ with input as (
         stability_days = (input.data #>> '{card,stability}')::double precision,
         difficulty = (input.data #>> '{card,difficulty}')::double precision,
         due_at = (input.data #>> '{card,due}')::timestamptz,
-        last_review_at = (input.data #>> '{card,last_review}')::timestamptz,
-        revision = fsrs.revision + 1
+        last_review_at = (input.data #>> '{card,last_review}')::timestamptz
     from input
     where fsrs.id = (input.data #>> '{card,card_id}')::bigint
-      and fsrs.revision = (input.data ->> 'expected_revision')::bigint
-      and fsrs.scheduler = input.data -> 'scheduler'
       and fsrs.id = (input.data #>> '{review_log,card_id}')::bigint
       and (input.data #>> '{card,last_review}')::timestamptz =
           (input.data #>> '{review_log,review_datetime}')::timestamptz
-      and (
-          fsrs.last_review_at is null
-          or (input.data #>> '{review_log,review_datetime}')::timestamptz >= fsrs.last_review_at
-      )
-    returning fsrs.id, fsrs.revision
+    returning fsrs.id
 ), logged as (
     insert into public.fsrs_review (fsrs_id, rating, review_datetime, review_duration)
     select updated.id,
@@ -33,6 +26,6 @@ with input as (
     cross join input
     returning fsrs_id
 )
-select updated.id, updated.revision
+select updated.id
 from updated
 join logged on logged.fsrs_id = updated.id;

@@ -33,7 +33,6 @@ def scheduler_config():
 
 def snapshot(card_id=1):
     return {
-        "revision": 0,
         "scheduler": scheduler_config(),
         "card": Card(
             card_id=card_id, due=datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -59,7 +58,7 @@ class FsrsScriptTests(unittest.TestCase):
         self.assertEqual(result["review_log"]["rating"], 4)
         self.assertEqual(result["review_log"]["review_duration"], 1500)
         self.assertIsNone(original["card"]["stability"])
-        current = {"revision": 1, "card": result["card"], "scheduler": result["scheduler"]}
+        current = {"card": result["card"], "scheduler": original["scheduler"]}
         probability = command("retrievability", {
             "snapshot": current, "current_datetime": "2026-01-02T00:00:00+00:00",
         })["retrievability"]
@@ -68,7 +67,7 @@ class FsrsScriptTests(unittest.TestCase):
 
     def test_reschedule_uses_history(self):
         first = command("review", review_input(snapshot()))
-        current = {"revision": 1, "card": first["card"], "scheduler": first["scheduler"]}
+        current = {"card": first["card"], "scheduler": scheduler_config()}
         result = command("reschedule", {
             "snapshot": current,
             "scheduler": current["scheduler"] | {"desired_retention": 0.95},
@@ -180,25 +179,38 @@ class FsrsDatabaseTests(unittest.TestCase):
             "insert into public.knowledge_record (body, depth, sibling_order) "
             "values ('测试知识', 0, 0) returning id"
         )
+        scheduler_config_id = self.query_file(
+            "create-scheduler-config.sql", self.Jsonb(scheduler_config())
+        )[0]
         fsrs_id = self.query_file("create-fsrs.sql", self.Jsonb({
             "record_ids": [record],
-            "scheduler": scheduler_config(),
+            "scheduler_config_id": scheduler_config_id,
             "due_at": "2026-01-01T00:00:00+00:00",
         }))[0]
+        shared_fsrs_id = self.query_file("create-fsrs.sql", self.Jsonb({
+            "record_ids": [record],
+            "scheduler_config_id": scheduler_config_id,
+            "due_at": "2026-01-01T00:00:00+00:00",
+        }))[0]
+        self.assertNotEqual(fsrs_id, shared_fsrs_id)
+        self.assertEqual(
+            self.query(
+                "select count(*) from public.fsrs where scheduler_config_id = %s",
+                (scheduler_config_id,),
+            ),
+            2,
+        )
         current = self.read_snapshot(fsrs_id)
         self.assertIsNone(current["card"]["stability"])
         first = command("review", review_input(current))
         self.assertEqual(
             self.query_file("save-fsrs-review.sql", self.Jsonb(first)),
-            (fsrs_id, 1),
+            (fsrs_id,),
         )
         saved = self.read_snapshot(fsrs_id)
         logs = self.query_file("read-fsrs-review-logs.sql", [fsrs_id])[0]
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs[0]["review_duration"], first["review_log"]["review_duration"])
-
-        self.assertIsNone(self.query_file("save-fsrs-review.sql", self.Jsonb(first)))
-        self.assertEqual(self.read_snapshot(fsrs_id), saved)
 
         invalid = command("review", review_input(saved, rating=3, day=1))
         invalid["review_log"]["rating"] = 0
@@ -208,27 +220,40 @@ class FsrsDatabaseTests(unittest.TestCase):
         self.assertEqual(self.read_snapshot(fsrs_id), saved)
         self.assertEqual(self.query("select count(*) from public.fsrs_review"), 1)
 
+        replacement_scheduler = saved["scheduler"] | {"desired_retention": 0.95}
+        replacement_config_id = self.query_file(
+            "create-scheduler-config.sql", self.Jsonb(replacement_scheduler)
+        )[0]
         replacement = command("reschedule", {
             "snapshot": saved, "review_logs": logs,
-            "scheduler": saved["scheduler"] | {"desired_retention": 0.95},
+            "scheduler": replacement_scheduler,
         })
+        replacement["scheduler_config_id"] = replacement_config_id
         self.assertEqual(
             self.query_file("save-fsrs-reschedule.sql", self.Jsonb(replacement)),
-            (fsrs_id, 2),
+            (fsrs_id,),
         )
         rescheduled = self.read_snapshot(fsrs_id)
+        self.assertEqual(rescheduled["scheduler_config_id"], replacement_config_id)
         self.assertEqual(rescheduled["scheduler"]["desired_retention"], 0.95)
         self.assertEqual(self.query("select count(*) from public.fsrs_review"), 1)
 
         with self.assertRaises(Exception) as missing_record:
             self.query_file("create-fsrs.sql", self.Jsonb({
-                "record_ids": [record + 1], "scheduler": scheduler_config(),
+                "record_ids": [record + 1],
+                "scheduler_config_id": scheduler_config_id,
             }))
         self.assertEqual(missing_record.exception.sqlstate, "23503")
+        with self.assertRaises(Exception) as missing_config:
+            self.query_file("create-fsrs.sql", self.Jsonb({
+                "record_ids": [record],
+                "scheduler_config_id": replacement_config_id + 1,
+            }))
+        self.assertEqual(missing_config.exception.sqlstate, "23503")
         self.assertIsNone(self.query_file("create-fsrs.sql", self.Jsonb({
-            "record_ids": [], "scheduler": scheduler_config(),
+            "record_ids": [], "scheduler_config_id": scheduler_config_id,
         })))
-        self.assertEqual(self.query("select count(*) from public.fsrs"), 1)
+        self.assertEqual(self.query("select count(*) from public.fsrs"), 2)
 
 
 if __name__ == "__main__":

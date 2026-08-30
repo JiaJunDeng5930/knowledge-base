@@ -183,6 +183,17 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
             }
         )
 
+    scheduler_configs: list[dict[str, Any]] = []
+    for row in _rows(raw["scheduler_configs"], "scheduler_configs"):
+        scheduler_configs.append(
+            {
+                "id": _decimal_string(row.get("id"), field="scheduler_config id"),
+                "scheduler": _json_object(
+                    row.get("scheduler"), field="scheduler_config scheduler"
+                ),
+            }
+        )
+
     fsrs: list[dict[str, Any]] = []
     for row in _rows(raw["fsrs"], "fsrs"):
         state = _enum_integer(
@@ -212,18 +223,15 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
         fsrs.append(
             {
                 "id": _decimal_string(row.get("id"), field="fsrs id"),
+                "scheduler_config_id": _decimal_string(
+                    row.get("scheduler_config_id"), field="fsrs scheduler_config_id"
+                ),
                 "state": state,
                 "step": step,
                 "stability_days": stability_days,
                 "difficulty": difficulty,
                 "last_review_at": last_review_at,
                 "due_at": _text(row.get("due_at"), field="fsrs due_at"),
-                "scheduler": _json_object(
-                    row.get("scheduler"), field="fsrs scheduler"
-                ),
-                "revision": _nonnegative_decimal_string(
-                    row.get("revision"), field="fsrs revision"
-                ),
             }
         )
 
@@ -266,6 +274,7 @@ def normalize_snapshot(raw: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]
         "records": records,
         "references": references,
         "effective_tags": effective_tags,
+        "scheduler_configs": scheduler_configs,
         "fsrs": fsrs,
         "fsrs_knowledge": fsrs_knowledge,
         "fsrs_review": fsrs_review,
@@ -333,8 +342,13 @@ TABLES: tuple[tuple[str, str, str], ...] = (
         "record_id,tag",
     ),
     (
+        "scheduler_config",
+        "id,scheduler",
+        "id",
+    ),
+    (
         "fsrs",
-        "id,state,step,stability_days,difficulty,last_review_at,due_at,scheduler,revision",
+        "id,scheduler_config_id,state,step,stability_days,difficulty,last_review_at,due_at",
         "id",
     ),
     (
@@ -371,6 +385,7 @@ class SupabaseClient:
                 "knowledge_record": "records",
                 "knowledge_reference": "references",
                 "effective_record_tag": "effective_tags",
+                "scheduler_config": "scheduler_configs",
                 "fsrs": "fsrs",
                 "fsrs_knowledge": "fsrs_knowledge",
                 "fsrs_review": "fsrs_review",

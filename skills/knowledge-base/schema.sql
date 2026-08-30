@@ -178,39 +178,16 @@ from inherited_tag;
 
 
 -- ============================================================
--- 4. FSRS-6 对象
+-- 4. Scheduler 配置
 --
--- 字段对应 py-fsrs Card；scheduler 保存 Scheduler.to_dict() 的完整配置。
--- 尚未复习的对象具有有效的阶段与到期时间，记忆状态及最后复习时间为空。
--- revision 用于库外计算后的条件写入，防止旧快照覆盖新状态。
+-- scheduler 保存 Scheduler.to_dict() 的完整配置。
+-- 多个 FSRS 对象可以引用同一条配置。
 -- ============================================================
 
-create table public.fsrs (
+create table public.scheduler_config (
     id bigint generated always as identity primary key,
-    state smallint not null default 1
-        check (state in (1, 2, 3)),
-    step integer default 0,
-    stability_days double precision
-        check (stability_days > 0 and stability_days < 'Infinity'::double precision),
-    difficulty double precision
-        check (difficulty between 1.0 and 10.0),
-    last_review_at timestamptz
-        check (isfinite(last_review_at)),
-    due_at timestamptz not null default current_timestamp
-        check (isfinite(due_at) and due_at >= last_review_at),
     scheduler jsonb not null,
-    revision bigint not null default 0
-        check (revision >= 0),
-    constraint fsrs_step_valid check (
-        (state = 2 and step is null)
-        or (state in (1, 3) and step is not null and step >= 0)
-    ),
-    constraint fsrs_memory_state_complete check (
-        (stability_days is null and difficulty is null and last_review_at is null)
-        or
-        (stability_days is not null and difficulty is not null and last_review_at is not null)
-    ),
-    constraint fsrs_scheduler_shape check (
+    constraint scheduler_config_scheduler_shape check (
         jsonb_typeof(scheduler) = 'object'
         and scheduler ?& array[
             'parameters', 'desired_retention', 'learning_steps',
@@ -229,10 +206,43 @@ create table public.fsrs (
     )
 );
 
+-- ============================================================
+-- 5. FSRS-6 对象
+--
+-- 字段对应 py-fsrs Card；scheduler_config_id 指向该对象使用的配置。
+-- 尚未复习的对象具有有效的阶段与到期时间，记忆状态及最后复习时间为空。
+-- ============================================================
+
+create table public.fsrs (
+    id bigint generated always as identity primary key,
+    scheduler_config_id bigint not null references public.scheduler_config (id),
+    state smallint not null default 1
+        check (state in (1, 2, 3)),
+    step integer default 0,
+    stability_days double precision
+        check (stability_days > 0 and stability_days < 'Infinity'::double precision),
+    difficulty double precision
+        check (difficulty between 1.0 and 10.0),
+    last_review_at timestamptz
+        check (isfinite(last_review_at)),
+    due_at timestamptz not null default current_timestamp
+        check (isfinite(due_at) and due_at >= last_review_at),
+    constraint fsrs_step_valid check (
+        (state = 2 and step is null)
+        or (state in (1, 3) and step is not null and step >= 0)
+    ),
+    constraint fsrs_memory_state_complete check (
+        (stability_days is null and difficulty is null and last_review_at is null)
+        or
+        (stability_days is not null and difficulty is not null and last_review_at is not null)
+    )
+);
+
 create index fsrs_due_idx on public.fsrs (due_at);
+create index fsrs_scheduler_config_idx on public.fsrs (scheduler_config_id);
 
 -- ============================================================
--- 5. FSRS 对象与知识记录的多对多关联
+-- 6. FSRS 对象与知识记录的多对多关联
 -- ============================================================
 
 create table public.fsrs_knowledge (
@@ -245,7 +255,7 @@ create index fsrs_knowledge_record_idx
     on public.fsrs_knowledge (record_id, fsrs_id);
 
 -- ============================================================
--- 6. 复习历史
+-- 7. 复习历史
 --
 -- 每行保存一次实际复习产生的 ReviewLog，供参数拟合和状态重算使用。
 -- 状态重算不产生新的复习观测；历史不通过当前状态的数值变化推测。
@@ -267,6 +277,7 @@ create index fsrs_review_object_time_idx
 alter table public.knowledge_record enable row level security;
 alter table public.knowledge_reference enable row level security;
 alter table public.record_tag enable row level security;
+alter table public.scheduler_config enable row level security;
 alter table public.fsrs enable row level security;
 alter table public.fsrs_knowledge enable row level security;
 alter table public.fsrs_review enable row level security;
@@ -277,6 +288,8 @@ create policy knowledge_reference_anon_select
     on public.knowledge_reference for select to anon using (true);
 create policy record_tag_anon_select
     on public.record_tag for select to anon using (true);
+create policy scheduler_config_anon_select
+    on public.scheduler_config for select to anon using (true);
 create policy fsrs_anon_select
     on public.fsrs for select to anon using (true);
 create policy fsrs_knowledge_anon_select

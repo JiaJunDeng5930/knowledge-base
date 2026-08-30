@@ -39,3 +39,11 @@
 | 用户要求 | 将当前 schema 部署到个人使用的 Supabase 项目。 |
 | 用户给出的原因 | 该知识库只供个人使用。 |
 | 实际改动 | 为全部知识库表启用 RLS，不创建 `anon` 或 `authenticated` 策略；将 `effective_record_tag` 设为 `security_invoker`，使视图遵守底层表的 RLS。已授权的 SQL 通道与 `service_role` 保持可用。 |
+
+## 2026-08-30：共享 Scheduler 配置
+
+| 项目 | 记录 |
+| --- | --- |
+| 用户要求 | 建立 `scheduler_config` 一对多 `fsrs` 的关系。 |
+| 用户给出的原因 | Scheduler 配置应由多个 FSRS 对象共同引用。 |
+| 实际改动 | `scheduler_config` 单独保存原生 Scheduler JSON，`fsrs.scheduler_config_id` 以外键引用配置；创建与重算查询按配置 id 建立或改变关联。 |

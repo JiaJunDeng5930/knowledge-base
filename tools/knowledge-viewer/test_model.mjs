@@ -17,16 +17,16 @@ const snapshot = {
     { source_record_id: "9007199254740993", target_record_id: "1" },
   ],
   effective_tags: [{ record_id: "2", tag: "working" }],
+  scheduler_configs: [{ id: "5", scheduler: { desired_retention: 0.9 } }],
   fsrs: [{
     id: "10",
+    scheduler_config_id: "5",
     state: 2,
     step: null,
     stability_days: 4.5,
     difficulty: 6,
     last_review_at: "2026-08-01T00:00:00Z",
     due_at: "2026-08-05T00:00:00Z",
-    scheduler: { desired_retention: 0.9 },
-    revision: "3",
   }],
   fsrs_knowledge: [{ fsrs_id: "10", record_id: "2" }],
   fsrs_review: [
@@ -45,6 +45,7 @@ assert.deepEqual(model.search("CHILD").map((record) => record.id), ["90071992547
 assert.deepEqual(model.outgoingById.get("1"), ["2"]);
 assert.deepEqual(model.incomingById.get("1"), ["9007199254740993"]);
 assert.deepEqual(model.tagsById.get("2"), ["working"]);
+assert.equal(model.schedulerConfigsById.get("5").scheduler.desired_retention, 0.9);
 assert.deepEqual(model.recordsByFsrs.get("10"), ["2"]);
 assert.deepEqual(
   model.reviewsByFsrs.get("10").map((review) => review.id),

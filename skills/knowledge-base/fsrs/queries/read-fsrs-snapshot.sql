@@ -1,7 +1,7 @@
 -- 参数：FSRS 对象 id。返回 Python 计算所需的完整 snapshot。
 select jsonb_build_object(
-    'revision', fsrs.revision,
-    'scheduler', fsrs.scheduler,
+    'scheduler_config_id', fsrs.scheduler_config_id,
+    'scheduler', scheduler_config.scheduler,
     'card', jsonb_build_object(
         'card_id', fsrs.id,
         'state', fsrs.state,
@@ -13,4 +13,6 @@ select jsonb_build_object(
     )
 ) as snapshot
 from public.fsrs
-where id = $1::bigint;
+join public.scheduler_config
+  on scheduler_config.id = fsrs.scheduler_config_id
+where fsrs.id = $1::bigint;

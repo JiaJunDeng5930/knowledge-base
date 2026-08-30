@@ -63,6 +63,9 @@ export function buildKnowledgeModel(snapshot) {
   for (const tag of snapshot.effective_tags) pushMapArray(tagsById, tag.record_id, tag.tag);
   for (const tags of tagsById.values()) tags.sort((left, right) => left.localeCompare(right));
 
+  const schedulerConfigsById = new Map(
+    snapshot.scheduler_configs.map((item) => [item.id, { ...item }]),
+  );
   const fsrsById = new Map(snapshot.fsrs.map((item) => [item.id, { ...item }]));
   const recordsByFsrs = new Map();
   const fsrsByRecord = new Map();
@@ -118,6 +121,7 @@ export function buildKnowledgeModel(snapshot) {
     outgoingById,
     incomingById,
     tagsById,
+    schedulerConfigsById,
     fsrsById,
     recordsByFsrs,
     fsrsByRecord,

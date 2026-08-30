@@ -320,16 +320,17 @@ function renderFsrsPanel(container, route, panelName) {
     container.append(empty);
     return;
   }
+  const schedulerConfig = state.model.schedulerConfigsById.get(fsrs.scheduler_config_id);
   const detail = element("section", "fsrs-detail");
   const fields = [
     ["id", fsrs.id],
+    ["Scheduler Config", fsrs.scheduler_config_id],
     ["状态", `${fsrs.state} · ${FSRS_STATE_LABELS[fsrs.state] || "未知"}`],
     ["Step", fsrs.step === null ? "不适用" : String(fsrs.step)],
     ["Stability", fsrs.stability_days === null ? "尚未估计" : `${fsrs.stability_days} 天`],
     ["Difficulty", fsrs.difficulty === null ? "尚未估计" : String(fsrs.difficulty)],
     ["最后复习", fsrs.last_review_at === null ? "尚未复习" : fsrs.last_review_at],
     ["下次到期", fsrs.due_at],
-    ["Revision", String(fsrs.revision)],
   ];
   for (const [name, value] of fields) {
     const field = element("div", "fsrs-field");
@@ -341,7 +342,11 @@ function renderFsrsPanel(container, route, panelName) {
 
   const scheduler = element("section", "fsrs-section");
   scheduler.append(element("h2", "section-title", "Scheduler 配置"));
-  scheduler.append(element("pre", "scheduler-config", JSON.stringify(fsrs.scheduler, null, 2)));
+  scheduler.append(element(
+    "pre",
+    "scheduler-config",
+    schedulerConfig ? JSON.stringify(schedulerConfig.scheduler, null, 2) : "配置不存在",
+  ));
   container.append(scheduler);
 
   const reviews = state.model.reviewsByFsrs.get(fsrs.id) || [];

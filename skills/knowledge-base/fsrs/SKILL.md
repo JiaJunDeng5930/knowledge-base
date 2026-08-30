@@ -11,15 +11,16 @@ FSRS（Free Spaced Repetition Scheduler）根据带时间的复习评分估计�
 
 ## 持久化数据
 
-操作数据库前读取 [schema.sql](../schema.sql)。该文件是字段与约束的唯一权威定义。FSRS 数据由以下三个表共同保存：
+操作数据库前读取 [schema.sql](../schema.sql)。该文件是字段与约束的唯一权威定义。FSRS 数据由以下四个表共同保存：
 
 | 表 | 保存的内容 |
 | --- | --- |
-| `fsrs` | 每个对象的当前 Card 状态与 Scheduler 配置；`revision` 用于检查计算使用的快照是否仍有效。 |
+| `scheduler_config` | 完整的原生 Scheduler 配置；一条配置可以供多个 FSRS 对象使用。 |
+| `fsrs` | 每个对象的当前 Card 状态及其 `scheduler_config_id`。 |
 | `fsrs_knowledge` | FSRS 对象与知识记录的多对多关联。每个对象至少关联一条知识记录。 |
 | `fsrs_review` | 每次复习的原生 ReviewLog 数据。优化器从这些历史数据重建各对象的记忆变化。 |
 
-对象的 `id` 对应 py-fsrs 的 `card_id`。对象的粒度由所需的记忆状态决定；一个对象可以关联多条知识记录，一条知识记录也可以供多个对象使用。
+对象的 `id` 对应 py-fsrs 的 `card_id`。对象的粒度由所需的记忆状态决定；一个对象可以关联多条知识记录，一条知识记录也可以供多个对象使用。多个对象可以通过同一个 `scheduler_config_id` 共用配置。
 
 Card 的 `state` 使用上游的完整状态集合：
 
@@ -35,7 +36,7 @@ ReviewLog 的评分 `rating` 使用下方参数表中的 G 编码。`review_date
 
 ## 调度配置
 
-每个对象的 `scheduler` 保存完整的原生 Scheduler 配置。下表覆盖该配置的全部字段；默认值通过 `settings` 命令取得。
+`scheduler_config.scheduler` 保存完整的原生 Scheduler 配置。下表覆盖该配置的全部字段；默认值通过 `settings` 命令取得。
 
 | 字段 | 含义 |
 | --- | --- |
@@ -50,7 +51,7 @@ ReviewLog 的评分 `rating` 使用下方参数表中的 G 编码。`review_date
 
 FSRS-6 使用 `w0` 到 `w20` 共 21 个参数。参数控制模型如何从观测估计记忆状态，同一适用范围内的对象使用同一组模型参数；每个对象分别保存自己的 S 和 D。
 
-参数集保存在对象的 `scheduler.parameters` 中。新配置的默认参数由随附实现提供；根据历史拟合得到的参数也使用这一字段。
+参数集保存在 `scheduler_config.scheduler.parameters` 中。新配置的默认参数由随附实现提供；根据历史拟合得到的参数也使用这一字段。
 
 下表按参数索引解释完整的参数集。G 是观测评分的编码：其取值在初始化稳定性对应的四行中给出。
 
@@ -104,11 +105,11 @@ py-fsrs 本身已保存在 `third_party/py-fsrs/`，脚本直接加载该副本�
 | 命令 | 输入 JSON | 输出 JSON |
 | --- | --- | --- |
 | `settings` | 可选的配置字段；未提供的字段采用上游默认值。 | 完整 Scheduler 配置。 |
-| `review` | `snapshot` 加本次事件的 `rating`。可选 `review_datetime` 和 `review_duration`；时间省略时使用当前 UTC 时间。 | 用于保存的 `expected_revision`、`card`、`scheduler` 和 `review_log`。 |
+| `review` | `snapshot` 加本次事件的 `rating`。可选 `review_datetime` 和 `review_duration`；时间省略时使用当前 UTC 时间。 | 用于保存的 `card` 和 `review_log`。 |
 | `retrievability` | `snapshot`；可选 `current_datetime`，省略时使用当前 UTC 时间。 | `retrievability`。 |
 | `optimize-parameters` | `scheduler` 与 `review_logs`。 | 含新参数集的 `scheduler`。 |
 | `optimize-retention` | `scheduler` 与 `review_logs`。 | 含新期望保留率的 `scheduler`。 |
-| `reschedule` | `snapshot`、要采用的 `scheduler` 和该对象的完整 `review_logs`。 | 用于保存的 `expected_revision`、`card` 和 `scheduler`。 |
+| `reschedule` | `snapshot`、要采用的 `scheduler` 和该对象的完整 `review_logs`。 | 用于保存的 `card`。 |
 
 ### 与数据库交换数据
 
@@ -118,11 +119,12 @@ agent 通过当前任务已配置且已授权的数据库接口读取数据，�
 
 | 查询资料 | 参数 | 返回值 |
 | --- | --- | --- |
-| [create-fsrs.sql](queries/create-fsrs.sql) | 包含 `record_ids` 与 `scheduler` 的 JSON；可选 `due_at`。配置可用 `settings` 取得。 | 新对象的 `id`；对象与知识关联在同一语句中建立。 |
+| [create-scheduler-config.sql](queries/create-scheduler-config.sql) | 完整 Scheduler 配置 JSON；配置可用 `settings` 取得。 | 新配置的 `id`。 |
+| [create-fsrs.sql](queries/create-fsrs.sql) | 包含 `record_ids` 与 `scheduler_config_id` 的 JSON；可选 `due_at`。 | 新对象的 `id`；对象与知识关联在同一语句中建立。 |
 | [read-fsrs-snapshot.sql](queries/read-fsrs-snapshot.sql) | 对象 id。 | Python 所需的 `snapshot`。 |
 | [read-fsrs-review-logs.sql](queries/read-fsrs-review-logs.sql) | 对象 id 数组。 | 按事件时间排序的 `review_logs`。 |
-| [save-fsrs-review.sql](queries/save-fsrs-review.sql) | `review` 命令的完整输出 JSON。 | 已保存对象的 `id` 与新 `revision`。 |
-| [save-fsrs-reschedule.sql](queries/save-fsrs-reschedule.sql) | `reschedule` 命令的完整输出 JSON。 | 已保存对象的 `id` 与新 `revision`。 |
+| [save-fsrs-review.sql](queries/save-fsrs-review.sql) | `review` 命令的完整输出 JSON。 | 已保存对象的 `id`。 |
+| [save-fsrs-reschedule.sql](queries/save-fsrs-reschedule.sql) | 包含 `reschedule` 输出的 `card` 与目标 `scheduler_config_id` 的 JSON。 | 已保存对象的 `id`。 |
 
 例如，将数据库查询返回的 `snapshot` 保存为 `snapshot.json` 后，可以构造一次评分为 3、耗时为 2400 毫秒的计算输入：
 
@@ -131,9 +133,7 @@ jq '{snapshot: ., rating: 3, review_duration: 2400}' snapshot.json |
   .venv/bin/python scripts/fsrs_data.py review -
 ```
 
-agent 将输出 JSON 作为 `save-fsrs-review.sql` 的参数，交给数据库接口执行。该语句根据 `expected_revision` 检查快照，并在同一事务中保存状态与对应历史。数据库接口返回已修改的记录后，本次结果才完成持久化。
-
-保存查询没有返回记录时，表示没有写入。先查询当前快照与历史，确认本次事件是否已经保存；仅对尚未保存的事件根据当前数据决定是否重新计算。
+agent 将输出 JSON 作为 `save-fsrs-review.sql` 的参数，交给数据库接口执行。该语句在同一事务中保存状态与对应历史。数据库接口返回已修改的记录后，本次结果才完成持久化。
 
 ### 使用历史进行优化
 
@@ -141,6 +141,6 @@ agent 将输出 JSON 作为 `save-fsrs-review.sql` 的参数，交给数据库�
 
 `optimize-retention` 调用上游 `Optimizer.compute_optimal_retention`，根据复习耗时估计期望保留率。该接口要求至少 512 条日志，并且每条日志的 `review_duration` 都有值。这里的门槛同样由上游实现规定。
 
-优化命令返回新的配置。采用新配置时，agent 先通过数据库接口读取每个目标对象的当前快照与完整历史，再把这些数据交给 `reschedule` 进行重算，最后通过数据库接口执行 `save-fsrs-reschedule.sql` 保存结果。历史中的最新事件应与快照的最后复习时间一致；重算本身不产生一次新的复习事件。
+优化命令返回新的配置。采用新配置时，agent 先执行 `create-scheduler-config.sql` 创建一条共享配置，再读取每个目标对象的当前快照与完整历史并交给 `reschedule` 重算。agent 将输出的 `card` 与新配置的 `scheduler_config_id` 交给 `save-fsrs-reschedule.sql`，使所有目标对象改用同一条配置。历史中的最新事件应与快照的最后复习时间一致；重算本身不产生一次新的复习事件。
 
 修改本模块时，先读取 [DECISIONS.md](../DECISIONS.md)。

@@ -16,7 +16,7 @@ tools/knowledge-viewer/run
 
 ## 固定读取边界
 
-服务只提供 `GET /api/snapshot`，由六个固定查询组成：`knowledge_record`、`knowledge_reference`、`effective_record_tag`、`fsrs`、`fsrs_knowledge` 和 `fsrs_review`。FSRS 快照包含当前原生 Card 状态、Scheduler 配置、revision、知识关联和复习历史。每次查询持续使用分页读取至空页，返回 bigint 时保持十进制字符串。其他表、列、SQL 和写入方法没有对应端点；所有非 GET 方法返回 405。
+服务只提供 `GET /api/snapshot`，由七个固定查询组成：`knowledge_record`、`knowledge_reference`、`effective_record_tag`、`scheduler_config`、`fsrs`、`fsrs_knowledge` 和 `fsrs_review`。FSRS 快照包含当前原生 Card 状态、共享 Scheduler 配置、知识关联和复习历史。每次查询持续使用分页读取至空页，返回 bigint 时保持十进制字符串。其他表、列、SQL 和写入方法没有对应端点；所有非 GET 方法返回 405。
 
 页面提供有序森林、记录级 zoom、面包屑、折叠、直接引用、反向链接、FSRS 关联、搜索和 Shift-click 右栏。正文使用文本节点显示，不解析 Markdown，也没有编辑、删除或调度修改能力。
 
@@ -29,4 +29,4 @@ python3 -m unittest discover -s tools/knowledge-viewer -p 'test_*.py' -v
 node tools/knowledge-viewer/test_model.mjs
 ```
 
-自动化测试覆盖 bigint 字符串化、六个固定查询、FSRS 状态与复习历史、publishable key 请求头、分页至空页、树与路径排序、搜索、直接引用/反向链接、FSRS 关联、loopback 绑定、GET-only HTTP 表面和错误信息脱敏。使用有效环境变量启动服务后，再检查 `/api/snapshot` 的真实连接状态；空表远端会显示空态。
+自动化测试覆盖 bigint 字符串化、七个固定查询、FSRS 状态与复习历史、publishable key 请求头、分页至空页、树与路径排序、搜索、直接引用/反向链接、FSRS 关联、loopback 绑定、GET-only HTTP 表面和错误信息脱敏。使用有效环境变量启动服务后，再检查 `/api/snapshot` 的真实连接状态；空表远端会显示空态。

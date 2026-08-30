@@ -33,14 +33,11 @@ def scheduler_from_data(data):
 
 def snapshot_from_data(data):
     snapshot = data["snapshot"]
-    revision = snapshot["revision"]
-    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
-        raise ValueError("FSRS revision 必须是非负整数")
     card = Card.from_dict(snapshot["card"])
     card.due = utc_datetime(card.due.isoformat())
     if card.last_review is not None:
         card.last_review = utc_datetime(card.last_review.isoformat())
-    return card, Scheduler.from_dict(snapshot["scheduler"]), revision
+    return card, Scheduler.from_dict(snapshot["scheduler"])
 
 
 def review_logs_from_data(data):
@@ -58,7 +55,7 @@ def review_logs_from_data(data):
 
 
 def review(data):
-    card, scheduler, revision = snapshot_from_data(data)
+    card, scheduler = snapshot_from_data(data)
     timestamp = utc_datetime(data.get("review_datetime"))
     if timestamp is not None and card.last_review is not None and timestamp < card.last_review:
         raise ValueError("FSRS 复习时间不能早于当前记忆状态的最后复习时间")
@@ -76,15 +73,13 @@ def review(data):
         review_duration=duration,
     )
     return {
-        "expected_revision": revision,
         "card": updated.to_dict(),
-        "scheduler": scheduler.to_dict(),
         "review_log": log.to_dict(),
     }
 
 
 def retrievability(data):
-    card, scheduler, _ = snapshot_from_data(data)
+    card, scheduler = snapshot_from_data(data)
     return {
         "retrievability": scheduler.get_card_retrievability(
             card, current_datetime=utc_datetime(data.get("current_datetime"))
@@ -115,7 +110,7 @@ def optimize_retention(data):
 
 
 def reschedule(data):
-    card, _, revision = snapshot_from_data(data)
+    card, _ = snapshot_from_data(data)
     scheduler = scheduler_from_data(data["scheduler"])
     logs = review_logs_from_data(data)
     if card.last_review is not None and (
@@ -123,11 +118,7 @@ def reschedule(data):
     ):
         raise ValueError("FSRS 重算需要目标对象的完整复习历史")
     updated = scheduler.reschedule_card(card, logs)
-    return {
-        "expected_revision": revision,
-        "card": updated.to_dict(),
-        "scheduler": scheduler.to_dict(),
-    }
+    return {"card": updated.to_dict()}
 
 
 COMMANDS = {

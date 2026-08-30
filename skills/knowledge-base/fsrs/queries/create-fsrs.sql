@@ -1,9 +1,9 @@
--- 参数：包含 record_ids 与 scheduler 的 JSON；due_at 可选。
+-- 参数：包含 record_ids 与 scheduler_config_id 的 JSON；due_at 可选。
 with input as (
     select $1::jsonb as data
 ), created as (
-    insert into public.fsrs (scheduler, due_at)
-    select data -> 'scheduler',
+    insert into public.fsrs (scheduler_config_id, due_at)
+    select (data ->> 'scheduler_config_id')::bigint,
            coalesce((data ->> 'due_at')::timestamptz, current_timestamp)
     from input
     where jsonb_array_length(data -> 'record_ids') > 0

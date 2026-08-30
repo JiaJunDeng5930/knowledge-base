@@ -1,4 +1,4 @@
--- 参数：fsrs_data.py reschedule 的完整 JSON 输出。
+-- 参数：包含 fsrs_data.py reschedule 输出的 card 与 scheduler_config_id 的 JSON。
 with input as (
     select $1::jsonb as data
 )
@@ -9,11 +9,8 @@ set state = (input.data #>> '{card,state}')::smallint,
     difficulty = (input.data #>> '{card,difficulty}')::double precision,
     due_at = (input.data #>> '{card,due}')::timestamptz,
     last_review_at = (input.data #>> '{card,last_review}')::timestamptz,
-    scheduler = input.data -> 'scheduler',
-    revision = fsrs.revision + 1
+    scheduler_config_id = (input.data ->> 'scheduler_config_id')::bigint
 from input
 where fsrs.id = (input.data #>> '{card,card_id}')::bigint
-  and fsrs.revision = (input.data ->> 'expected_revision')::bigint
-  and fsrs.last_review_at is not distinct from (input.data #>> '{card,last_review}')::timestamptz
   and not (input.data ? 'review_log')
-returning fsrs.id, fsrs.revision;
+returning fsrs.id;

@@ -35,6 +35,9 @@ def sample_snapshot():
         ],
         "references": [],
         "effective_tags": [],
+        "scheduler_configs": [
+            {"id": "1", "scheduler": {"desired_retention": 0.9}}
+        ],
         "fsrs": [],
         "fsrs_knowledge": [],
         "fsrs_review": [],
@@ -44,14 +47,13 @@ def sample_snapshot():
 def sample_fsrs(**overrides):
     row = {
         "id": "1",
+        "scheduler_config_id": "1",
         "state": 1,
         "step": 0,
         "stability_days": None,
         "difficulty": None,
         "last_review_at": None,
         "due_at": "2026-08-28T00:00:00+00:00",
-        "scheduler": {"desired_retention": 0.9},
-        "revision": "0",
     }
     row.update(overrides)
     return row
@@ -124,13 +126,22 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         self.assertIsNone(result["fsrs"][0]["stability_days"])
         self.assertIsNone(result["fsrs"][0]["difficulty"])
         self.assertIsNone(result["fsrs"][0]["last_review_at"])
-        self.assertEqual(result["fsrs"][0]["scheduler"], {"desired_retention": 0.9})
+        self.assertEqual(
+            result["scheduler_configs"][0]["scheduler"],
+            {"desired_retention": 0.9},
+        )
+        self.assertEqual(result["fsrs"][0]["scheduler_config_id"], "1")
         self.assertIsNone(result["fsrs"][1]["step"])
         self.assertIsNone(result["fsrs_review"][0]["review_duration"])
 
     def test_normalize_preserves_all_bigint_values_as_decimal_strings(self):
         snapshot = sample_snapshot()
-        snapshot["fsrs"] = [sample_fsrs(id=3, revision=9007199254740994)]
+        snapshot["scheduler_configs"] = [
+            {"id": 9007199254740994, "scheduler": {"desired_retention": 0.9}}
+        ]
+        snapshot["fsrs"] = [
+            sample_fsrs(id=3, scheduler_config_id=9007199254740994)
+        ]
         snapshot["fsrs_review"] = [
             {
                 "id": 9007199254740995,
@@ -145,8 +156,9 @@ class KnowledgeViewerServerTests(unittest.TestCase):
 
         self.assertEqual(result["records"][0]["id"], "9007199254740993")
         self.assertEqual(result["records"][0]["sibling_order"], "-2")
+        self.assertEqual(result["scheduler_configs"][0]["id"], "9007199254740994")
         self.assertEqual(result["fsrs"][0]["id"], "3")
-        self.assertEqual(result["fsrs"][0]["revision"], "9007199254740994")
+        self.assertEqual(result["fsrs"][0]["scheduler_config_id"], "9007199254740994")
         self.assertEqual(result["fsrs_review"][0]["id"], "9007199254740995")
         self.assertEqual(result["fsrs_review"][0]["fsrs_id"], "3")
         self.assertEqual(
@@ -155,11 +167,12 @@ class KnowledgeViewerServerTests(unittest.TestCase):
 
     def test_normalize_rejects_invalid_states_ratings_and_nullable_fields(self):
         invalid_rows = (
-            (sample_fsrs(state=4), None),
-            (sample_fsrs(state=2, step=0), None),
-            (sample_fsrs(stability_days=1.0), None),
-            (sample_fsrs(scheduler=[]), None),
+            (sample_fsrs(state=4), None, None),
+            (sample_fsrs(state=2, step=0), None, None),
+            (sample_fsrs(stability_days=1.0), None, None),
+            (None, {"id": "1", "scheduler": []}, None),
             (
+                None,
                 None,
                 {
                     "id": "2",
@@ -171,6 +184,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             ),
             (
                 None,
+                None,
                 {
                     "id": "2",
                     "fsrs_id": "1",
@@ -180,15 +194,21 @@ class KnowledgeViewerServerTests(unittest.TestCase):
                 },
             ),
         )
-        for fsrs_row, review_row in invalid_rows:
-            with self.subTest(fsrs=fsrs_row, review=review_row):
+        for fsrs_row, scheduler_config_row, review_row in invalid_rows:
+            with self.subTest(
+                fsrs=fsrs_row,
+                scheduler_config=scheduler_config_row,
+                review=review_row,
+            ):
                 snapshot = sample_snapshot()
                 snapshot["fsrs"] = [] if fsrs_row is None else [fsrs_row]
+                if scheduler_config_row is not None:
+                    snapshot["scheduler_configs"] = [scheduler_config_row]
                 snapshot["fsrs_review"] = [] if review_row is None else [review_row]
                 with self.assertRaises(UpstreamError):
                     normalize_snapshot(snapshot)
 
-    def test_client_runs_six_queries_and_reads_until_empty_page(self):
+    def test_client_runs_seven_queries_and_reads_until_empty_page(self):
         rows = {
             "knowledge_record": [
                 {
@@ -202,6 +222,7 @@ class KnowledgeViewerServerTests(unittest.TestCase):
             ],
             "knowledge_reference": [],
             "effective_record_tag": [],
+            "scheduler_config": [],
             "fsrs": [],
             "fsrs_knowledge": [],
             "fsrs_review": [],
@@ -230,12 +251,16 @@ class KnowledgeViewerServerTests(unittest.TestCase):
         fsrs_query = urllib.parse.parse_qs(
             urllib.parse.urlsplit(requests_by_table["fsrs"].full_url).query
         )
+        scheduler_config_query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(requests_by_table["scheduler_config"].full_url).query
+        )
         review_query = urllib.parse.parse_qs(
             urllib.parse.urlsplit(requests_by_table["fsrs_review"].full_url).query
         )
+        self.assertEqual(scheduler_config_query["select"][0], "id,scheduler")
         self.assertEqual(
             fsrs_query["select"][0],
-            "id,state,step,stability_days,difficulty,last_review_at,due_at,scheduler,revision",
+            "id,scheduler_config_id,state,step,stability_days,difficulty,last_review_at,due_at",
         )
         self.assertEqual(
             review_query["select"][0],
