@@ -200,12 +200,16 @@ create table public.scheduler_config (
 -- ============================================================
 -- 5. FSRS-6 对象
 --
+-- cue 保存该对象调度的场景等价类及学习者需要恢复的具体理解。
 -- 字段对应 py-fsrs Card；scheduler_config_id 指向该对象使用的配置。
 -- 尚未复习的对象具有有效的阶段与到期时间，记忆状态及最后复习时间为空。
 -- ============================================================
 
 create table public.fsrs (
     id bigint generated always as identity primary key,
+    cue text not null
+        constraint fsrs_cue_nonempty
+        check (btrim(cue) <> ''),
     scheduler_config_id bigint not null references public.scheduler_config (id),
     state smallint not null default 1
         check (state in (1, 2, 3)),
