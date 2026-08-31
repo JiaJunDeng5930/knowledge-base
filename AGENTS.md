@@ -64,6 +64,8 @@
 | 场景 skill | 面向一种认知活动的完整处理方式，例如学习、间隔重复或深入思考。场景特有的组织与交互由它决定。 |
 | 人类界面 | LLM 针对当前任务生成的教程、问题、反馈、摘要或其他表现形式。它不是核心存储模型。 |
 
+FSRS cue 模型使用以下稳定概念，具体含义由创建 FSRS 的场景 skill 统一说明：[知识应用场景](skills/scenarios/create-fsrs-for-knowledge-model/SKILL.md#知识应用场景)、[场景等价类](skills/scenarios/create-fsrs-for-knowledge-model/SKILL.md#场景等价类)、[cue](skills/scenarios/create-fsrs-for-knowledge-model/SKILL.md#cue)。
+
 ## 横向扩展点
 
 ### 场景 skill
