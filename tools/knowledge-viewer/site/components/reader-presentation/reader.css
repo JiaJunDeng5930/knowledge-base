@@ -1,6 +1,8 @@
+@import "./page-content/page-content.css";
+
 /*
  * 阅读呈现：字体、字号、行距、配色、布局、间距、图标、热区、焦点与响应式的唯一入口。
- * :root 是集中配置；以下按导航、书页、正文、关联与浮层组织规则。
+ * :root 是集中配置；以下组织导航、书页、关联与浮层；page-content/ 组织页内内容块。
  * JSX 只提供内容层级和页序；字号偏好只写入 --reader-font-selected。
  */
 :root {
@@ -73,8 +75,6 @@
   --reader-spine-limit: 4;
   --reader-tree-step: .75rem;
   --reader-tree-max: 6;
-  --reader-content-depth-limit: 3;
-  --reader-branch-indent: 1rem;
   --reader-control-size: 2rem;
   --reader-control-touch: 2.75rem;
   --reader-icon-size: 1rem;
@@ -160,7 +160,6 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 .nav-item { display: flex; align-items: center; gap: var(--reader-space-2); width: 100%; min-height: var(--reader-control-size); padding: var(--reader-space-1) var(--reader-space-2); text-align: left; font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); border-radius: var(--reader-radius); color: var(--reader-ink); }
 .nav-item svg { color: var(--reader-muted); }
 .nav-item span { flex: 1; overflow-wrap: anywhere; }
-.nav-item small, .tree-count { color: var(--reader-muted); font-size: var(--reader-font-meta); font-variant-numeric: tabular-nums; }
 .nav-item:hover, .navigation-row:hover { background: var(--reader-hover); }
 .nav-item[data-active="true"], .navigation-row[data-active="true"] { background: var(--reader-selected); color: var(--reader-link); }
 .navigation-tree, .navigation-tree ul { list-style: none; padding: 0; margin: 0; }
@@ -210,8 +209,8 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 
 /* 所有连续阅读区域共用同一正文节奏；辅助信息只使用界面字号与界面行高。 */
 .index-title, .note-title { color: var(--reader-ink); font-size: var(--reader-font-title); font-weight: var(--reader-weight-heading); line-height: var(--reader-leading-heading); overflow-wrap: anywhere; margin: 0 0 var(--reader-heading-after); }
-.note-title code, .branch-title code { font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); font-weight: inherit; }
-.index-intro, .index-counts { font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); color: var(--reader-muted); margin: 0 0 var(--reader-space-5); }
+.note-title code { font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); font-weight: inherit; }
+.index-intro { font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); color: var(--reader-muted); margin: 0 0 var(--reader-space-5); }
 .index-group { margin-top: var(--reader-space-5); }
 .section-caption { display: flex; align-items: center; justify-content: space-between; gap: var(--reader-space-3); margin-bottom: var(--reader-space-3); }
 .section-caption h2 { display: flex; align-items: baseline; gap: var(--reader-space-2); margin: 0; font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); font-weight: var(--reader-weight-emphasis); color: var(--reader-muted); }
@@ -219,7 +218,6 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 .topic-entry { margin: var(--reader-space-4) 0 var(--reader-space-5); }
 .topic-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--reader-space-3); }
 .topic-title { font-size: var(--reader-font-section); font-weight: var(--reader-weight-emphasis); line-height: var(--reader-leading-heading); }
-.topic-heading > small { color: var(--reader-muted); font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); flex-shrink: 0; }
 .topic-children { border-left: 1px solid var(--reader-line); padding-left: var(--reader-space-4); margin-top: var(--reader-space-3); display: grid; gap: var(--reader-space-3); }
 .topic-children:empty { display: none; }
 .topic-children p { font-size: var(--reader-font-ui); color: var(--reader-muted); line-height: var(--reader-leading-body); margin: var(--reader-space-1) 0 0; }
@@ -239,49 +237,8 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 .knowledge-link:hover, .text-link:hover { text-decoration: underline; text-underline-offset: var(--reader-outline-offset); }
 .knowledge-link[data-reading="true"] { background: var(--reader-selected); text-decoration: underline; text-underline-offset: var(--reader-outline-offset); }
 .text-link { color: var(--reader-link); font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); display: inline-flex; align-items: center; gap: var(--reader-space-1); }
-.prose-note { font-size: var(--reading-font-size); line-height: var(--reader-leading-body); color: var(--reader-ink); overflow-wrap: anywhere; }
-.prose-note > :first-child { margin-top: 0; }
-.prose-note > :last-child { margin-bottom: 0; }
-.prose-note p { margin: 0 0 var(--reader-paragraph-gap); }
-.prose-note h1, .prose-note h2, .prose-note h3, .prose-note h4, .prose-note h5, .prose-note h6 { font-weight: var(--reader-weight-heading); line-height: var(--reader-leading-heading); margin: var(--reader-heading-before) 0 var(--reader-heading-after); }
-.prose-note h1 { font-size: var(--reader-font-title); }
-.prose-note h2 { font-size: var(--reader-font-section); }
-.prose-note h3, .prose-note h4, .prose-note h5, .prose-note h6 { font-size: var(--reader-font-subheading); }
-.prose-note ul, .prose-note ol { padding-left: var(--reader-indent); margin: var(--reader-paragraph-gap) 0; }
-.prose-note ul { list-style: disc; }
-.prose-note ol { list-style: decimal; }
-.prose-note li { margin: var(--reader-list-gap) 0; }
-.prose-note li > p { margin-bottom: var(--reader-list-gap); }
-.prose-note li > ul, .prose-note li > ol { margin-block: var(--reader-list-gap); }
-.prose-note blockquote { border-left: var(--reader-outline-width) solid var(--reader-line); padding-left: var(--reader-indent); margin: var(--reader-paragraph-gap) 0; color: var(--reader-muted); }
-.prose-note a { color: var(--reader-link); text-decoration: none; }
-.prose-note a:hover { text-decoration: underline; text-underline-offset: var(--reader-outline-offset); }
-.prose-note code { font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); background: var(--reader-code-surface); border-radius: var(--reader-radius); padding: 0 var(--reader-space-1); white-space: break-spaces; }
-.prose-note pre { background: var(--reader-code-surface); border-radius: var(--reader-radius); padding: var(--reader-space-3) var(--reader-space-4); overflow-x: auto; margin: var(--reader-paragraph-gap) 0; font-size: var(--reader-font-code-ratio); line-height: var(--reader-leading-code); }
-.prose-note pre code { padding: 0; background: none; font-size: inherit; white-space: pre; }
-.prose-note hr { border: 0; border-top: 1px solid var(--reader-line); margin: var(--reader-space-5) 0; }
-.markdown-table-wrap { width: 100%; overflow-x: auto; margin: var(--reader-paragraph-gap) 0; }
-.prose-note table { border-collapse: collapse; width: 100%; font-size: inherit; text-align: left; line-height: var(--reader-leading-body); }
-.prose-note td, .prose-note th { border-bottom: 1px solid var(--reader-line); padding: var(--reader-space-2) var(--reader-space-3); vertical-align: top; min-width: 5em; }
-.prose-note th { font-weight: var(--reader-weight-emphasis); }
-.image-source { display: inline-flex; align-items: center; gap: var(--reader-space-1); }
-.raw-body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); line-height: var(--reader-leading-code); background: var(--reader-code-surface); padding: var(--reader-space-4); margin: var(--reader-space-3) 0; }
 .child-notes { margin-top: var(--reader-paragraph-gap); }
-.bullet-branch { margin: 0 0 var(--reader-paragraph-gap); position: relative; }
-.branch-row { display: grid; grid-template-columns: var(--reader-control-size) minmax(0, 1fr) auto; gap: 0; align-items: start; }
-.branch-toggle { display: flex; align-items: center; justify-content: center; width: var(--reader-control-size); height: max(var(--reader-control-size), 1lh); color: var(--reader-muted); border-radius: var(--reader-radius); }
-.branch-toggle:hover { background: var(--reader-hover); color: var(--reader-link); }
-.branch-bullet { color: var(--reader-muted); text-align: center; line-height: var(--reader-leading-body); }
-.branch-heading { margin: 0; }
-.branch-title { font-weight: var(--reader-weight-emphasis); }
-.branch-heading + .prose-note { margin-top: var(--reader-list-gap); }
-.branch-open { width: var(--reader-control-size); height: max(var(--reader-control-size), 1lh); display: flex; align-items: center; justify-content: center; color: var(--reader-muted); border-radius: var(--reader-radius); }
-.branch-open:hover, .branch-open:focus-visible { color: var(--reader-link); background: var(--reader-hover); }
-.branch-children { --branch-indent-visible: clamp(0, calc(var(--reader-content-depth-limit) - var(--branch-depth)), 1); border-left: 1px solid var(--reader-line); margin: var(--reader-list-gap) 0 0 calc(var(--reader-space-4) * var(--branch-indent-visible)); padding-left: calc(var(--reader-branch-indent) * var(--branch-indent-visible)); }
-.branch-children .bullet-branch:last-child { margin-bottom: 0; }
-.collapsed-count { color: var(--reader-muted); font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); display: block; }
 [data-located="true"] { background: var(--reader-highlight); outline: 1px solid var(--reader-highlight-strong); }
-.bullet-branch[data-linked="true"] > .branch-row { background: var(--reader-selected); }
 .location-message { display: flex; align-items: center; gap: var(--reader-space-2); font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); color: var(--reader-highlight-ink); background: var(--reader-highlight); padding-left: var(--reader-space-2); margin: 0 0 var(--reader-space-3); }
 .location-message .icon-button { margin-left: auto; }
 .note-end { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--reader-space-3); padding-top: var(--reader-space-3); margin-top: var(--reader-space-5); color: var(--reader-muted); font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); }
@@ -292,18 +249,10 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 
 /* 引用与记忆使用相同的行距；标识与调度状态降为次要信息。 */
 .note-relations { margin-top: var(--reader-space-6); border-top: 1px solid var(--reader-line); padding-top: var(--reader-space-4); }
-.reference-group { margin-bottom: var(--reader-space-5); }
-.reference-group h2 { display: flex; align-items: center; gap: var(--reader-space-2); color: var(--reader-muted); font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); font-weight: var(--reader-weight-emphasis); margin: 0 0 var(--reader-space-3); }
-.reference-group h2 span { margin-left: auto; font-size: var(--reader-font-meta); }
-.reference-group ul { list-style: none; margin: 0; padding: 0; }
-.reference-group li { margin: 0 0 var(--reader-paragraph-gap); line-height: var(--reader-leading-body); }
-.reference-group li small { display: block; font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); color: var(--reader-muted); margin-bottom: var(--reader-space-1); overflow-wrap: anywhere; }
-.reference-group li p { margin-top: var(--reader-space-1); color: var(--reader-muted); }
 .memory-relations > summary, .memory-state-details > summary, .review-history > summary, .scheduler-details > summary { display: flex; align-items: center; gap: var(--reader-space-2); padding: var(--reader-space-2) 0; color: var(--reader-muted); font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); cursor: pointer; list-style: none; min-height: var(--reader-control-size); }
 .memory-relations > summary::-webkit-details-marker, .memory-state-details > summary::-webkit-details-marker, .review-history > summary::-webkit-details-marker, .scheduler-details > summary::-webkit-details-marker { display: none; }
 .memory-relations > summary > svg:last-child, .memory-state-details > summary > svg:last-child, .review-history > summary > svg:last-child, .scheduler-details > summary > svg:last-child { margin-left: auto; }
 details[open] > summary > svg:last-child { transform: rotate(180deg); }
-.relation-count { font-size: var(--reader-font-meta); }
 .memory-relation { display: flex; align-items: baseline; gap: var(--reader-space-3); width: 100%; text-align: left; padding: var(--reader-space-2) 0; line-height: var(--reader-leading-body); color: var(--reader-link); overflow-wrap: anywhere; }
 .memory-relation > span { flex: 1; min-width: 0; }
 .memory-relation small { display: block; font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); color: var(--reader-muted); margin-top: var(--reader-space-1); }
@@ -444,13 +393,11 @@ mark { background: var(--reader-highlight); color: inherit; padding: 0; }
   :root { --reader-control-size: var(--reader-control-touch); }
 }
 @media (max-width: 47.9375rem) {
-  :root { --reader-page-gutter: 1.25rem; --reader-page-top: 1.5rem; --reader-branch-indent: .5rem; --reader-context-width: 8rem; --reader-state-column: 6.5rem; }
+  :root { --reader-page-gutter: 1.25rem; --reader-page-top: 1.5rem; --reader-context-width: 8rem; --reader-state-column: 6.5rem; }
   .header-primary { padding: 0 var(--reader-space-2); }
   .reading-path-navigation { padding-inline: var(--reader-space-2); }
   .sheet-actions { top: 0; right: 0; }
   .sheet-content { padding-bottom: calc(var(--reader-page-bottom) + env(safe-area-inset-bottom)); }
-  .branch-row { grid-template-columns: var(--reader-space-5) minmax(0, 1fr) auto; }
-  .branch-toggle { width: var(--reader-space-5); }
   .memory-status-line time { margin-left: 0; }
   .memory-facts { gap: var(--reader-space-3); }
   .search-dialog { max-height: calc(100dvh - var(--reader-space-6)); }
@@ -458,7 +405,7 @@ mark { background: var(--reader-highlight); color: inherit; padding: 0; }
   .help-content dl > div { flex-wrap: wrap; }
 }
 @media print {
-  [data-slot="sidebar"], .reading-header, .sheet-actions, .sheet-spine, .skip-link, .branch-open, .branch-toggle, .note-tools { display: none !important; }
+  [data-slot="sidebar"], .reading-header, .sheet-actions, .sheet-spine, .skip-link, .note-tools { display: none !important; }
   .knowledge-app, .reader-main, .reading-stack, .reading-sheet, .sheet-scroll { display: block !important; position: static !important; height: auto; overflow: visible; width: 100% !important; }
   .reading-sheet { border: 0; box-shadow: none; break-after: page; }
   .reading-sheet > :not(.sheet-spine) { visibility: visible !important; }

@@ -1,0 +1,96 @@
+/* 页内正文、内容块、链接与两个方向的引用，共用下列局部尺度和阅读主题。 */
+:root {
+  --page-block-control: 1.5rem;
+  --page-block-control-touch: 2rem;
+  --page-block-dot-size: .3125rem;
+  --page-block-ring: .2rem;
+  --page-block-indent: 1.25rem;
+  --page-block-indent-limit: 3;
+  --page-block-gap: var(--reader-list-gap);
+  --page-block-guide: var(--reader-line);
+  --page-reference-gap: var(--reader-space-4);
+  --page-reference-surface: color-mix(in srgb, var(--reader-selected) 25%, var(--reader-paper));
+}
+
+.prose-note { font-size: var(--reading-font-size); line-height: var(--reader-leading-body); color: var(--reader-ink); overflow-wrap: anywhere; }
+.prose-note > :first-child { margin-top: 0; }
+.prose-note > :last-child { margin-bottom: 0; }
+.prose-note p { margin: 0 0 var(--reader-paragraph-gap); }
+.prose-note h1, .prose-note h2, .prose-note h3, .prose-note h4, .prose-note h5, .prose-note h6 { font-weight: var(--reader-weight-heading); line-height: var(--reader-leading-heading); margin: var(--reader-heading-before) 0 var(--reader-heading-after); }
+.prose-note h1 { font-size: var(--reader-font-title); }
+.prose-note h2 { font-size: var(--reader-font-section); }
+.prose-note h3, .prose-note h4, .prose-note h5, .prose-note h6 { font-size: var(--reader-font-subheading); }
+.prose-note ul, .prose-note ol { padding-left: var(--reader-indent); margin: var(--reader-paragraph-gap) 0; }
+.prose-note ul { list-style: disc; }
+.prose-note ol { list-style: decimal; }
+.prose-note li { margin: var(--reader-list-gap) 0; }
+.prose-note li > p { margin-bottom: var(--reader-list-gap); }
+.prose-note li > ul, .prose-note li > ol { margin-block: var(--reader-list-gap); }
+.prose-note blockquote { border-left: var(--reader-outline-width) solid var(--reader-line); padding-left: var(--reader-indent); margin: var(--reader-paragraph-gap) 0; color: var(--reader-muted); }
+.prose-note a { color: var(--reader-link); text-decoration: none; }
+.prose-note a:hover { text-decoration: underline; text-underline-offset: var(--reader-outline-offset); }
+.prose-note code { font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); background: var(--reader-code-surface); border-radius: var(--reader-radius); padding: 0 var(--reader-space-1); white-space: break-spaces; }
+.prose-note pre { background: var(--reader-code-surface); border-radius: var(--reader-radius); padding: var(--reader-space-3) var(--reader-space-4); overflow-x: auto; margin: var(--reader-paragraph-gap) 0; font-size: var(--reader-font-code-ratio); line-height: var(--reader-leading-code); }
+.prose-note pre code { padding: 0; background: none; font-size: inherit; white-space: pre; }
+.prose-note hr { border: 0; border-top: 1px solid var(--reader-line); margin: var(--reader-space-5) 0; }
+.markdown-table-wrap { width: 100%; overflow-x: auto; margin: var(--reader-paragraph-gap) 0; }
+.prose-note table { border-collapse: collapse; width: 100%; font-size: inherit; text-align: left; line-height: var(--reader-leading-body); }
+.prose-note td, .prose-note th { border-bottom: 1px solid var(--reader-line); padding: var(--reader-space-2) var(--reader-space-3); vertical-align: top; min-width: 5em; }
+.prose-note th { font-weight: var(--reader-weight-emphasis); }
+.image-source { display: inline-flex; align-items: center; gap: var(--reader-space-1); }
+.raw-body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--reader-font-code); font-size: var(--reader-font-code-ratio); line-height: var(--reader-leading-code); background: var(--reader-code-surface); padding: var(--reader-space-4); margin: var(--reader-space-3) 0; }
+
+/* 圆点打开块，三角展开下级；两者具有独立热区，不占用正文链接。 */
+.page-block-list { list-style: none; padding: 0; margin: 0; position: relative; }
+.page-block { position: relative; margin: 0; padding: 0; line-height: var(--reader-leading-body); }
+.page-block + .page-block { margin-top: var(--page-block-gap); }
+.page-block-row { display: grid; grid-template-columns: var(--page-block-control) var(--page-block-control) minmax(0, 1fr); align-items: start; }
+.page-block-toggle, .page-link--bullet, .page-block-unavailable-dot { display: flex; align-items: center; justify-content: center; width: var(--page-block-control); height: max(var(--page-block-control), 1lh); color: var(--reader-muted); border-radius: var(--reader-radius); }
+.page-block-toggle svg { width: var(--reader-icon-small); height: var(--reader-icon-small); }
+.page-block-toggle:hover, .page-block-toggle:focus-visible, .page-link--bullet:hover, .page-link--bullet:focus-visible { color: var(--reader-link); background: var(--reader-hover); }
+.page-block-dot { display: block; width: var(--page-block-dot-size); height: var(--page-block-dot-size); background: currentColor; border-radius: 50%; }
+.page-link--bullet[data-collapsed="true"] .page-block-dot { box-shadow: 0 0 0 var(--page-block-ring) var(--reader-line); }
+.page-block-content { min-width: 0; padding-block: 0; }
+.page-block-heading { font-weight: var(--reader-weight-emphasis); }
+.page-block-heading + .prose-note { margin-top: var(--reader-list-gap); }
+.page-block-unavailable { margin: 0; color: var(--reader-muted); }
+.page-block > .page-block-list {
+  --page-block-indent-visible: clamp(0, calc(var(--page-block-indent-limit) - var(--page-block-depth) + 1), 1);
+  margin-inline-start: calc(var(--page-block-indent) * var(--page-block-indent-visible));
+  margin-block-start: var(--page-block-gap);
+}
+.page-block > .page-block-list::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: calc(var(--page-block-control) * 1.5 - var(--page-block-indent) * var(--page-block-indent-visible)); border-inline-start: 1px solid var(--page-block-guide); opacity: var(--page-block-indent-visible); pointer-events: none; }
+.page-block[data-linked="true"] > .page-block-row { background: var(--reader-selected); }
+
+/* 内部链接的双括号是提示，链接文字仍保持连续的正文行距。 */
+.page-link { color: var(--reader-link); text-decoration: none; overflow-wrap: anywhere; }
+.page-link--inline::before { content: "[["; }
+.page-link--inline::after { content: "]]"; }
+.page-link--inline::before, .page-link--inline::after { color: var(--reader-muted); font-weight: var(--reader-weight-regular); }
+.page-link--inline:hover, .page-link--context:hover { text-decoration: underline; text-underline-offset: var(--reader-outline-offset); }
+.page-link[data-reading="true"] { background: var(--reader-selected); }
+.page-external-link > svg { display: inline; vertical-align: baseline; width: var(--reader-icon-small); height: var(--reader-icon-small); margin-inline-start: var(--reader-space-1); }
+
+/* 两个引用方向共享来源路径和原文块，不使用摘要卡片或额外打开箭头。 */
+.page-reference-section { margin: 0 0 var(--reader-space-4); }
+.page-reference-section > summary { display: flex; align-items: center; gap: var(--reader-space-1); list-style: none; cursor: pointer; min-height: var(--reader-control-size); color: var(--reader-muted); }
+.page-reference-section > summary::-webkit-details-marker { display: none; }
+.page-reference-section > summary h2 { font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); font-weight: var(--reader-weight-emphasis); margin: 0; }
+.page-reference-section > summary:hover { color: var(--reader-ink); }
+.page-reference-caret { width: var(--reader-icon-small); height: var(--reader-icon-small); }
+.page-reference-section[open] > summary > .page-reference-caret { transform: rotate(90deg); }
+.page-reference-groups { padding-top: var(--reader-space-2); }
+.page-reference-group + .page-reference-group { margin-top: var(--page-reference-gap); }
+.page-reference-context { font-size: var(--reader-font-meta); line-height: var(--reader-leading-ui); color: var(--reader-muted); margin-bottom: var(--reader-space-1); padding-inline: var(--reader-space-1); }
+.page-reference-context ol { display: flex; flex-wrap: wrap; gap: 0 var(--reader-space-1); list-style: none; padding: 0; margin: 0; }
+.page-reference-context li { display: flex; align-items: baseline; gap: var(--reader-space-1); min-width: 0; }
+.page-reference-context li + li::before { content: "›"; color: var(--reader-muted); }
+.page-reference-context .page-link { padding-block: var(--reader-space-1); }
+.page-reference-group > .page-block-list { background: var(--page-reference-surface); padding-block: var(--page-block-gap); padding-inline-end: var(--reader-space-2); }
+
+@media (max-width: 47.9375rem), (pointer: coarse) {
+  :root { --page-block-control: var(--page-block-control-touch); }
+}
+@media print {
+  .page-block-toggle { visibility: hidden; }
+}

@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Clock3, Code2, Copy, FileText, Hash, List, Maximize2, Minimize2, PanelLeft, PanelLeftClose, RefreshCw, RotateCcw, Search, X, MapPin, AlignLeft, Minus, Plus, SlidersHorizontal, Delete } from "lucide-react";
+import { ArrowUpRight, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Clock3, Code2, Copy, FileText, Hash, List, Maximize2, Minimize2, PanelLeft, PanelLeftClose, RefreshCw, RotateCcw, Search, X, MapPin, AlignLeft, Minus, Plus, SlidersHorizontal, Delete } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -17,17 +15,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { buildKnowledgeModel } from "@/lib/knowledge-model";
 import { bulletTitle, followPanel, panelKey, readPanels, readingUrl, resultExcerpt, searchBullets, searchExcerpt, splitBulletContent } from "@/lib/reading-path";
 import { ReadingDisclosure, ReadingViewProvider, useReadingView, type ReadingView } from "@/components/reading-view";
-import { readingHighlightPlugin } from "@/lib/reading-highlight";
+import { BulletBody, InlineTitle } from "@/components/reader-presentation/page-content/content";
+import { PageBulletList } from "@/components/reader-presentation/page-content/block-list";
+import { PageReferences } from "@/components/reader-presentation/page-content/reference-list";
+import { ROOT_LABELS, type Navigate } from "@/components/reader-presentation/page-content/model";
 import { IconButton } from "@/components/reader-presentation/icon-button";
 import { readingFontSettings, readingSpineOffset, scrollReadingTarget } from "@/components/reader-presentation/metrics";
 import { useReadingFont } from "@/components/reader-presentation/use-reading-font";
 import type { Bullet, Fsrs, Panel, Review, Snapshot } from "@/lib/knowledge-types";
 
 type Model = ReturnType<typeof buildKnowledgeModel>;
-type Navigate = (panel: Panel, from?: number) => void;
 const FSRS_STATES = {1: "学习中", 2: "复习中", 3: "重新学习"};
 const FSRS_RATINGS = {1: "Again · 忘记", 2: "Hard · 困难", 3: "Good · 良好", 4: "Easy · 容易"};
-const ROOT_LABELS: Record<string, string> = { knowledge: "主题知识", source: "来源材料" };
 
 function rootLabel(bullet: Bullet) { return ROOT_LABELS[bullet.body.trim()] || bulletTitle(bullet.body); }
 function dateText(value: string | null, withTime = false): string {
@@ -77,7 +76,7 @@ function KnowledgeLink({id, model, from, navigate, children, preview = true, cla
   }}>{children || (bullet ? bulletTitle(bullet.body) : "笔记 " + id)}</a>;
   if (!preview || !bullet) return link;
   const sub: Bullet[] = model.getChildren(id);
-  return <Tooltip delayDuration={450}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="top" align="start" className="note-tooltip"><small>{pathLabel(model, id) || "知识库"} · #{id}</small><p className="preview-body">{searchExcerpt(bullet.body, "", 320)}</p>{!!sub.length && <ul className="preview-children">{sub.slice(0, 3).map(item => <li key={item.id}>{searchExcerpt(item.body, "", 90)}</li>)}</ul>}{(selected || sub.length > 0) && <span>{selected ? "已在后文打开" : ""}{selected && sub.length > 0 ? " · " : ""}{sub.length ? sub.length + " 条下级内容" : ""}</span>}</TooltipContent></Tooltip>;
+  return <Tooltip delayDuration={450}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="top" align="start" className="note-tooltip"><small>{pathLabel(model, id) || "知识库"} · #{id}</small><p className="preview-body">{searchExcerpt(bullet.body, "", 320)}</p>{!!sub.length && <ul className="preview-children">{sub.slice(0, 3).map(item => <li key={item.id}>{searchExcerpt(item.body, "", 90)}</li>)}</ul>}{selected && <span>已在后文打开</span>}</TooltipContent></Tooltip>;
 }
 
 function NavigationTree({bullet, model, navigate, activeId, depth = 0}: {bullet: Bullet; model: Model; navigate: Navigate; activeId?: string; depth?: number}) {
@@ -96,7 +95,6 @@ function NavigationTree({bullet, model, navigate, activeId, depth = 0}: {bullet:
     <div ref={rowRef} className="navigation-row" data-active={activeId === bullet.id} style={{"--tree-depth": depth} as CSSProperties}>
       {children.length ? <button className="tree-disclosure" onClick={() => setExpanded(!expanded)} aria-label={(expanded ? "折叠 " : "展开 ") + bulletTitle(bullet.body)} aria-expanded={expanded}>{expanded ? <ChevronDown/> : <ChevronRight/>}</button> : <span className="tree-dot" />}
       <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}</button>
-      {!!children.length && <span className="tree-count">{children.length}</span>}
     </div>
     {expanded && !!children.length && <ul>{children.map(child => <NavigationTree key={child.id} bullet={child} model={model} navigate={navigate} activeId={activeId} depth={depth + 1}/>)}</ul>}
   </li>;
@@ -107,21 +105,21 @@ function ReaderNavigation({model, panels, active, navigate}: {model: Model | nul
   const open: Navigate = panel => {navigate(panel); if (isMobile) setOpenMobile(false);};
   const activePanel = panels[active];
   const tags = useMemo(() => {
-    const counts = new Map<string, number>();
-    if (model) for (const values of model.tagsById.values()) for (const tag of values) counts.set(tag, (counts.get(tag) || 0) + 1);
-    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const values = new Set<string>();
+    if (model) for (const tags of model.tagsById.values()) for (const tag of tags) values.add(tag);
+    return [...values].sort((a, b) => a.localeCompare(b));
   }, [model]);
   return <Sidebar className="reader-sidebar">
     <SidebarHeader className="navigation-header"><h2>目录</h2>{isMobile && <IconButton label="收起目录" onClick={() => setOpenMobile(false)}><X/></IconButton>}</SidebarHeader>
     <SidebarContent className="navigation-content"><nav aria-label="知识库浏览">
       <div className="navigation-section navigation-indexes">
-        <button className="nav-item" data-active={activePanel?.kind === "all"} onClick={() => open({kind: "all"})}><List/><span>全部笔记</span><small>{model?.bullets.length ?? "—"}</small></button>
-        <button className="nav-item" data-active={activePanel?.kind === "memory" || activePanel?.kind === "fsrs"} onClick={() => open({kind: "memory"})}><Clock3/><span>记忆</span><small>{model?.fsrsById.size ?? "—"}</small></button>
+        <button className="nav-item" data-active={activePanel?.kind === "all"} onClick={() => open({kind: "all"})}><List/><span>全部笔记</span></button>
+        <button className="nav-item" data-active={activePanel?.kind === "memory" || activePanel?.kind === "fsrs"} onClick={() => open({kind: "memory"})}><Clock3/><span>记忆</span></button>
       </div>
       <div className="navigation-section">
         {model ? <ul className="navigation-tree">{model.rootBullets.map((bullet: Bullet) => <NavigationTree key={bullet.id} bullet={bullet} model={model} navigate={open} activeId={activePanel?.kind === "bullet" ? activePanel.id : undefined}/>)}</ul> : <div className="navigation-skeleton"><Skeleton/><Skeleton/><Skeleton/></div>}
       </div>
-      {!!tags.length && <div className="navigation-section"><h2>标签</h2>{tags.map(([tag, count]) => <button key={tag} className="nav-item tag-nav" data-active={activePanel?.kind === "tag" && activePanel.tag === tag} onClick={() => open({kind: "tag", tag})}><Hash/><span>{tag}</span><small>{count}</small></button>)}</div>}
+      {!!tags.length && <div className="navigation-section"><h2>标签</h2>{tags.map(tag => <button key={tag} className="nav-item tag-nav" data-active={activePanel?.kind === "tag" && activePanel.tag === tag} onClick={() => open({kind: "tag", tag})}><Hash/><span>{tag}</span></button>)}</div>}
     </nav></SidebarContent>
   </Sidebar>;
 }
@@ -157,48 +155,6 @@ function ReadingHeader({panels, active, model, activate, navigate, search, font,
   </header>;
 }
 
-function BulletBody({body, from, navigate, raw = false, query = ""}: {body: string; from: number; navigate: Navigate; raw?: boolean; query?: string}) {
-  if (!body) return null;
-  if (raw) return <pre className="raw-body">{body}</pre>;
-  return <div className="prose-note"><Markdown remarkPlugins={[remarkGfm]} rehypePlugins={query ? [readingHighlightPlugin(query)] : []} components={{
-    a: ({href, children}) => {
-      const internal = href?.match(/^\/(bullet|fsrs)\/(-?\d+)\/?$/);
-      if (internal) return <a href={href} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return; event.preventDefault(); navigate({kind: internal[1] as "bullet" | "fsrs", id: internal[2]}, from); }}>{children}</a>;
-      return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
-    },
-    table: ({children}) => <div className="markdown-table-wrap"><table>{children}</table></div>,
-    img: ({src, alt}) => typeof src === "string" ? <a className="image-source" href={src} target="_blank" rel="noopener noreferrer">查看图片：{alt || "图片"} <ArrowUpRight/></a> : null,
-  }}>{body}</Markdown></div>;
-}
-
-function InlineTitle({text, query = "", insideLink = false}: {text: string; query?: string; insideLink?: boolean}) {
-  return <Markdown rehypePlugins={query ? [readingHighlightPlugin(query)] : []} components={{p: ({children}) => <>{children}</>, a: ({href, children}) => insideLink ? <>{children}</> : <a href={href}>{children}</a>}}>{text}</Markdown>;
-}
-
-function BulletBranch({bullet, model, from, navigate, depth = 0, ancestors = []}: {bullet: Bullet; model: Model; from: number; navigate: Navigate; depth?: number; ancestors?: string[]}) {
-  const {view, updateView, nextPanel} = useReadingView();
-  const children: Bullet[] = model.getChildren(bullet.id);
-  const expanded = view.expanded[bullet.id] ?? true;
-  const {heading, content} = splitBulletContent(bullet.body);
-  if (ancestors.includes(bullet.id)) return null;
-  const toggle = () => updateView(current => ({expanded: {...current.expanded, [bullet.id]: !expanded}}));
-  return <section className="bullet-branch" data-bullet-id={bullet.id} data-located={view.focusedId === bullet.id} data-linked={nextPanel?.kind === "bullet" && nextPanel.id === bullet.id}>
-    <div className="branch-row">
-      {!!children.length ? <button className="branch-toggle" aria-label={(expanded ? "折叠下级：" : "展开下级：") + bulletTitle(bullet.body)} aria-expanded={expanded} onClick={toggle}>{expanded ? <ChevronDown/> : <ChevronRight/>}</button> : <span className="branch-bullet" aria-hidden="true">·</span>}
-      <div className="branch-text">
-        {heading && <div className="branch-heading"><KnowledgeLink id={bullet.id} {...{model, from, navigate}} preview={false} className="branch-title"><InlineTitle text={heading} query={view.highlight} insideLink/></KnowledgeLink></div>}
-        {!!content && <BulletBody body={content} {...{from, navigate}} query={view.highlight}/>}
-        {!!children.length && !expanded && <span className="collapsed-count" aria-hidden="true">… {model.getSubtree(bullet.id).length}</span>}
-      </div>
-      {!heading && <a className="branch-open" href={readingUrl([{kind: "bullet", id: bullet.id}])} title="单独打开这条内容，查看关联" aria-label={"打开笔记：" + bulletTitle(bullet.body)} onClick={event => {
-        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-        event.preventDefault(); navigate({kind: "bullet", id: bullet.id}, from);
-      }}><ArrowUpRight/></a>}
-    </div>
-    {!!children.length && expanded && <div className="branch-children" style={{"--branch-depth": depth} as CSSProperties}>{children.map(child => <BulletBranch key={child.id} {...{model, from, navigate}} bullet={child} depth={depth + 1} ancestors={[...ancestors, bullet.id]}/>)}</div>}
-  </section>;
-}
-
 function NoteRelations({bullet, model, from, navigate}: {bullet: Bullet; model: Model; from: number; navigate: Navigate}) {
   const outgoing: string[] = model.outgoingById.get(bullet.id) || [];
   const incoming: string[] = model.incomingById.get(bullet.id) || [];
@@ -207,17 +163,13 @@ function NoteRelations({bullet, model, from, navigate}: {bullet: Bullet; model: 
   if (!outgoing.length && !incoming.length && !memories.length) return null;
   const expandedMemories = view.details["all-memories"] ?? false;
   return <aside className="note-relations" aria-label="这条笔记的关联">
-    {[{title: "引用", ids: outgoing, icon: <ArrowUpRight/>}, {title: "反向引用", ids: incoming, icon: <ArrowDownLeft/>}].filter(group => group.ids.length).map(group => <section className="reference-group" key={group.title}><h2>{group.icon}{group.title}<span>{group.ids.length}</span></h2><ul>{group.ids.map(id => {
-      const linked: Bullet | undefined = model.bulletsById.get(id);
-      const {title, excerpt} = linked ? resultText(linked, "") : {title: "笔记 #" + id, excerpt: ""};
-      return <li key={id}><small>{pathLabel(model, id)}</small><KnowledgeLink {...{id, model, from, navigate}}>{title}</KnowledgeLink>{excerpt && <p>{excerpt}</p>}</li>;
-    })}</ul></section>)}
-    {!!memories.length && <ReadingDisclosure id="memory-relations" className="memory-relations" title={<><Clock3/><span>记忆</span><span className="relation-count">{memories.length}</span><ChevronDown/></>}>
+    <PageReferences id={bullet.id} {...{model, from, navigate}}/>
+    {!!memories.length && <ReadingDisclosure id="memory-relations" className="memory-relations" title={<><Clock3/><span>记忆</span><ChevronDown/></>}>
       <div className="memory-relation-list">{memories.slice(0, expandedMemories ? undefined : 5).map(id => {
         const memory: Fsrs | undefined = model.fsrsById.get(id);
         return <button key={id} className="memory-relation" onClick={() => navigate({kind: "fsrs", id}, from)}><span>{memoryTitle(id, model)}<small>#{id} · {memory ? FSRS_STATES[memory.state] : "暂不可用"}</small></span><ArrowUpRight/></button>;
       })}</div>
-      {memories.length > 5 && <button className="text-link relation-more" onClick={() => updateView(current => ({details: {...current.details, "all-memories": !expandedMemories}}))}>{expandedMemories ? "收起列表" : "显示其余 " + (memories.length - 5) + " 个记忆对象"}</button>}
+      {memories.length > 5 && <button className="text-link relation-more" onClick={() => updateView(current => ({details: {...current.details, "all-memories": !expandedMemories}}))}>{expandedMemories ? "收起列表" : "显示更多"}</button>}
     </ReadingDisclosure>}
   </aside>;
 }
@@ -294,16 +246,16 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
     {focusError && <p role="status" className="location-message">{focusError}</p>}
     {view.highlight && <div className="search-match-bar" role="region" aria-label="搜索命中"><span title={view.highlight}>“{view.highlight}”</span><small role="status">{matchCount ? Math.min(view.matchIndex + 1, matchCount) + " / " + matchCount : "当前展开内容无匹配"}</small><IconButton label="上一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex - 1)}><ArrowLeft/></IconButton><IconButton label="下一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex + 1)}><ArrowRight/></IconButton><IconButton label="清除搜索高亮" onClick={() => updateView({highlight: "", matchIndex: 0})}><X/></IconButton></div>}
     <div data-bullet-id={id} className="note-opening" data-located={view.focusedId === id}>
-      {heading ? <h1 className="note-title"><InlineTitle text={heading} query={view.highlight}/></h1> : <h1 className="sr-only">{bulletTitle(bullet.body, 140)}</h1>}
+      {heading ? <h1 className="note-title"><InlineTitle text={heading} query={view.highlight} {...{from, navigate}}/></h1> : <h1 className="sr-only">{bulletTitle(bullet.body, 140)}</h1>}
       <BulletBody body={content} {...{from, navigate}} query={view.highlight}/>
     </div>
     {!!tags.length && <div className="note-tags" aria-label="有效标签，包含从祖先继承的标签">{tags.map(tag => <button key={tag} title="包含直接与继承标签" onClick={() => navigate({kind: "tag", tag}, from)}>#{tag}</button>)}</div>}
     {!!children.length && <section className="child-notes">
       {view.focusedId && view.focusedId !== id && <div className="location-message" role="status"><MapPin/><span>原文位置</span><IconButton label="清除定位标记" onClick={() => updateView({focusedId: null})}><X/></IconButton></div>}
-      {children.map(child => <BulletBranch key={child.id} bullet={child} {...{model, from, navigate}} ancestors={[id]}/>)}
+      <PageBulletList parentId={id} {...{model, from, navigate}}/>
     </section>}
     <NoteRelations {...{bullet, model, from, navigate}}/>
-    <div className="note-end"><span>笔记 #{id} · {bullet.body.length.toLocaleString()} 字符</span><IconButton label={view.raw ? "收起原文" : "查看原文"} onClick={() => updateView({raw: !view.raw})} aria-expanded={view.raw} aria-pressed={view.raw}><Code2/></IconButton></div>
+    <div className="note-end"><span>笔记 #{id}</span><IconButton label={view.raw ? "收起原文" : "查看原文"} onClick={() => updateView({raw: !view.raw})} aria-expanded={view.raw} aria-pressed={view.raw}><Code2/></IconButton></div>
     {view.raw && <BulletBody body={bullet.body} {...{from, navigate}} raw/>}
     {siblings.length > 1 && <nav className="sibling-navigation" aria-label="同级内容"><div>{siblings[siblingIndex - 1] && <button aria-label={"上一条：" + bulletTitle(siblings[siblingIndex - 1].body)} onClick={() => navigate({kind: "bullet", id: siblings[siblingIndex - 1].id}, from - 1)}><ArrowLeft/><span>{bulletTitle(siblings[siblingIndex - 1].body, 95)}</span></button>}</div><div>{siblings[siblingIndex + 1] && <button aria-label={"下一条：" + bulletTitle(siblings[siblingIndex + 1].body)} onClick={() => navigate({kind: "bullet", id: siblings[siblingIndex + 1].id}, from - 1)}><ArrowRight/><span>{bulletTitle(siblings[siblingIndex + 1].body, 95)}</span></button>}</div></nav>}
   </>;
@@ -311,14 +263,14 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
 
 function IndexPage({model, from, navigate}: {model: Model; from: number; navigate: Navigate}) {
   const roots: Bullet[] = model.rootBullets;
-  return <><h1 className="index-title">知识索引</h1><p className="index-counts">{model.bullets.length} 条笔记 · {model.fsrsById.size} 个记忆对象</p>
+  return <><h1 className="index-title">知识索引</h1>
     {!roots.length && <EmptyState title="知识库还没有内容">已有内容会在这里按原有结构呈现。</EmptyState>}
     {roots.map(root => {
       const children: Bullet[] = model.getChildren(root.id);
       return <section key={root.id} className="index-group"><div className="section-caption"><h2><KnowledgeLink id={root.id} {...{model, from, navigate}} preview={false}>{rootLabel(root)}</KnowledgeLink></h2></div>
         {children.length ? children.map(child => {
           const sub: Bullet[] = model.getChildren(child.id);
-          return <article className="topic-entry" key={child.id}><div><div className="topic-heading"><KnowledgeLink id={child.id} {...{model, from, navigate}} className="topic-title" preview={false}/><small>{model.getSubtree(child.id).length} 条内容</small></div>
+          return <article className="topic-entry" key={child.id}><div><div className="topic-heading"><KnowledgeLink id={child.id} {...{model, from, navigate}} className="topic-title" preview={false}/></div>
             <div className="topic-children">{sub.map(item => {
               const items: Bullet[] = model.getChildren(item.id);
               return <div key={item.id}><KnowledgeLink id={item.id} {...{model, from, navigate}}>{bulletTitle(item.body, 100)}</KnowledgeLink>{!!items.length && <p>{items.slice(0, 5).map(note => bulletTitle(note.body, 35)).join(" · ")}{items.length > 5 ? " …" : ""}</p>}</div>;
@@ -349,7 +301,7 @@ function BulletListPage({model, from, navigate, tag}: {model: Model; from: numbe
   const results: Bullet[] = useMemo(() => searchBullets(candidates, deferredQuery), [candidates, deferredQuery]);
   return <><h1 className="index-title">{tag ? "#" + tag : "全部笔记"}</h1>{tag && <p className="index-intro">直接标签与继承标签。</p>}
     <label className="inline-search"><Search/><input aria-label={tag ? "在此标签中搜索" : "筛选全部笔记"} placeholder="搜索内容或 #编号…" value={query} onChange={event => updateView({query: event.target.value, limit: 60})}/>{query && <IconButton label="清除筛选" onClick={() => updateView({query: "", limit: 60})}><X/></IconButton>}</label>
-    <div className="result-count" role="status">{query ? results.length + " 条匹配 · “" + query + "”" : results.length + " 条笔记 · 按目录顺序"}</div>
+    <div className="result-count" role="status">{query ? results.length + " 条匹配 · “" + query + "”" : "按目录顺序"}</div>
     <div className="note-results">{results.slice(0, limit).map(bullet => {
       const {title, excerpt} = resultText(bullet, query);
       const context: Panel | null = bullet.parent_id ? {kind: "bullet", id: bullet.parent_id, focus: bullet.id, ...(query.trim() ? {highlight: query.trim()} : {})} : null;
@@ -357,7 +309,7 @@ function BulletListPage({model, from, navigate, tag}: {model: Model; from: numbe
 
     })}</div>
     {!results.length && <EmptyState title="没有找到匹配的笔记">试试更短的关键词，或清除筛选。</EmptyState>}
-    {results.length > limit && <button className="load-more" onClick={() => updateView({limit: limit + 60})}>继续显示 · 还有 {results.length - limit} 条</button>}
+    {results.length > limit && <button className="load-more" onClick={() => updateView({limit: limit + 60})}>继续显示</button>}
   </>;
 }
 
@@ -371,19 +323,18 @@ function MemoryListPage({model, from, navigate, now}: {model: Model; from: numbe
   const {view, updateView} = useReadingView();
   const {memoryFilter: filter, query, limit} = view;
   const all: Fsrs[] = Array.from(model.fsrsById.values());
-  const due = all.filter(item => new Date(item.due_at).getTime() <= now);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const rows = all.filter(item => (filter !== "due" || new Date(item.due_at).getTime() <= now) && (
     (terms.length === 1 && terms[0].replace(/^#/, "") === item.id) ||
     terms.every(term => item.cue.toLowerCase().includes(term) || (model.bulletsByFsrs.get(item.id) || []).some((id: string) => model.bulletsById.get(id)?.body.toLowerCase().includes(term)))
   )).sort((a, b) => a.due_at.localeCompare(b.due_at));
   return <><h1 className="index-title">记忆与复习</h1>
-    <Tabs value={filter} onValueChange={value => updateView({memoryFilter: value, limit: 60})} className="memory-tabs"><TabsList><TabsTrigger value="all">全部 {all.length}</TabsTrigger><TabsTrigger value="due">已到期 {due.length}</TabsTrigger></TabsList></Tabs>
+    <Tabs value={filter} onValueChange={value => updateView({memoryFilter: value, limit: 60})} className="memory-tabs"><TabsList><TabsTrigger value="all">全部</TabsTrigger><TabsTrigger value="due">已到期</TabsTrigger></TabsList></Tabs>
     <label className="inline-search"><Search/><input aria-label="搜索记忆对象" placeholder="搜索复习线索、关联内容或 #编号…" value={query} onChange={e => updateView({query: e.target.value, limit: 60})}/>{query && <IconButton label="清除记忆筛选" onClick={() => updateView({query: "", limit: 60})}><X/></IconButton>}</label>
-    <div className="result-count" role="status">{rows.length} 个对象 · 按到期时间排列</div>
-    <Table className="memory-table"><TableHeader><TableRow><TableHead>复习线索</TableHead><TableHead>状态与到期</TableHead></TableRow></TableHeader><TableBody>{rows.slice(0, limit).map(item => <TableRow key={item.id}><TableCell><button className="memory-title" onClick={() => navigate({kind: "fsrs", id: item.id}, from)}><Highlight text={memoryTitle(item.id, model)} query={query}/></button><small>#{item.id} · {(model.bulletsByFsrs.get(item.id) || []).length} 条关联笔记</small></TableCell><TableCell><span className="state-label">{FSRS_STATES[item.state]}</span><small className={new Date(item.due_at).getTime() <= now ? "due-text" : ""} title={dateText(item.due_at, true)}>{dueLabel(item.due_at, now)}</small><time dateTime={item.due_at}>{dateText(item.due_at)}</time></TableCell></TableRow>)}</TableBody></Table>
+    <div className="result-count" role="status">{query ? rows.length + " 条匹配 · " : ""}按到期时间排列</div>
+    <Table className="memory-table"><TableHeader><TableRow><TableHead>复习线索</TableHead><TableHead>状态与到期</TableHead></TableRow></TableHeader><TableBody>{rows.slice(0, limit).map(item => <TableRow key={item.id}><TableCell><button className="memory-title" onClick={() => navigate({kind: "fsrs", id: item.id}, from)}><Highlight text={memoryTitle(item.id, model)} query={query}/></button><small>#{item.id}</small></TableCell><TableCell><span className="state-label">{FSRS_STATES[item.state]}</span><small className={new Date(item.due_at).getTime() <= now ? "due-text" : ""} title={dateText(item.due_at, true)}>{dueLabel(item.due_at, now)}</small><time dateTime={item.due_at}>{dateText(item.due_at)}</time></TableCell></TableRow>)}</TableBody></Table>
     {!rows.length && <EmptyState title={all.length ? "没有匹配的记忆对象" : "还没有记忆对象"}>{all.length ? "调整筛选，查看其他对象。" : "创建后的记忆对象、知识关联与复习历史会显示在这里。"}</EmptyState>}
-    {rows.length > limit && <button className="load-more" onClick={() => updateView({limit: limit + 60})}>继续显示 · 还有 {rows.length - limit} 个</button>}
+    {rows.length > limit && <button className="load-more" onClick={() => updateView({limit: limit + 60})}>继续显示</button>}
   </>;
 }
 
@@ -402,7 +353,7 @@ function MemoryPage({id, model, from, navigate, now}: {id: string; model: Model;
     <div className="note-meta"><span>记忆对象 #{id}</span><span>{FSRS_STATES[memory.state]}</span></div><h1 className="note-title memory-page-title">复习线索</h1>
     <section className="memory-cue" aria-label="完整 cue"><BulletBody body={memory.cue} {...{from, navigate}}/></section>
     <div className="memory-status-line"><Clock3/><strong>{dueLabel(memory.due_at, now)}</strong><time dateTime={memory.due_at}>{dateText(memory.due_at, true)}</time></div>
-    <section className="memory-knowledge"><div className="section-caption"><h2>关联知识 <span>{bulletIds.length}</span></h2></div>{ordered.map(bullet => {
+    <section className="memory-knowledge"><div className="section-caption"><h2>关联知识</h2></div>{ordered.map(bullet => {
       const {heading, content} = splitBulletContent(bullet.body);
       const level = model.getPath(bullet.id).slice(1, -1).filter((part: {id: string | null}) => part.id !== null && selected.has(part.id)).length;
       return <div className="memory-bullet" key={bullet.id} style={{"--tree-depth": level} as CSSProperties}>
@@ -440,8 +391,8 @@ function SearchDialog({open, setOpen, model, navigate, active}: {open: boolean; 
   return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="search-dialog" showCloseButton={false}>
     <DialogTitle className="sr-only">搜索整个知识库</DialogTitle><DialogDescription className="sr-only">查找内容、复习线索或编号。上下方向键选择，回车打开；已输入的关键词会保留。</DialogDescription>
     <Command value={selection} onValueChange={setSelection} shouldFilter={false} className="knowledge-command"><div className="command-input-row"><CommandInput value={query} onValueChange={changeQuery} placeholder="搜索内容或 #编号…"/>{query && <IconButton label="清除搜索词" onClick={() => changeQuery("")}><Delete/></IconButton>}<IconButton label="关闭搜索" onClick={() => setOpen(false)}><X/></IconButton></div>
-      <Tabs value={filter} onValueChange={value => {setFilter(value); setLimit(40); setSelection("");}} className="search-tabs"><TabsList><TabsTrigger value="all">全部</TabsTrigger><TabsTrigger value="notes">笔记{query ? " " + matches.length : ""}</TabsTrigger><TabsTrigger value="memory">记忆对象{query ? " " + memoryMatches.length : ""}</TabsTrigger></TabsList></Tabs>
-      <div className="command-caption" role="status">{query ? (filter === "memory" ? memoryMatches.length + " 个记忆对象" : filter === "notes" ? matches.length + " 条笔记" : matches.length + " 条笔记 · " + memoryMatches.length + " 个记忆对象") : "多个关键词用空格分开；输入 #编号可直接定位"}</div>
+      <Tabs value={filter} onValueChange={value => {setFilter(value); setLimit(40); setSelection("");}} className="search-tabs"><TabsList><TabsTrigger value="all">全部</TabsTrigger><TabsTrigger value="notes">笔记</TabsTrigger><TabsTrigger value="memory">记忆对象</TabsTrigger></TabsList></Tabs>
+      <div className="command-caption" role="status">{query ? (filter === "memory" ? memoryMatches.length : filter === "notes" ? matches.length : matches.length + memoryMatches.length) + " 条匹配" : "多个关键词用空格分开；输入 #编号可直接定位"}</div>
       <CommandList className="knowledge-command-list"><CommandEmpty>没有找到匹配的内容，试试更短的关键词。</CommandEmpty>
         {filter !== "memory" && !!matches.length && <CommandGroup heading={filter === "all" && memoryMatches.length ? "笔记" : undefined}>{matches.slice(0, limit).map(bullet => {
           const {title, excerpt} = resultText(bullet, deferred);
@@ -455,7 +406,7 @@ function SearchDialog({open, setOpen, model, navigate, active}: {open: boolean; 
 }
 
 function HelpDialog({open, setOpen}: {open: boolean; setOpen: (open: boolean) => void}) {
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>知识库只读。浏览不会修改内容或记录复习。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。标题链接可独立打开笔记；没有标题的段落使用旁边的箭头。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>知识库只读。浏览不会修改内容或记录复习。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。圆点在后文独立打开内容块，旁边的三角只展开或收起下级；圆点外的淡色圆环表示下级已折叠。引用与反向引用保留来源路径和完整原文，点击路径可回到上下文。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
 }
 
 function ReaderWorkspace() {
