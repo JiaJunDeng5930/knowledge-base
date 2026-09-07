@@ -15,6 +15,8 @@ description: 在需要读取或维护个人知识库时使用。指导模型按�
 
 涉及 FSRS 数据或计算时，读取 [FSRS 子 skill](fsrs/SKILL.md)。该模块解释完整的 FSRS 数据与参数，并说明 agent 如何在计算脚本与数据库接口之间传递数据。
 
+修改 bullet 正文、结构、直接标签或引用时，先读取 [预览与批注子 skill](bullet-review/SKILL.md)。先把变更保存到 Supabase 草稿，供用户在网站中预览和批注；用户确认当前整体 diff 后再提交正式知识。处理批注只更新草稿。该流程适用于各场景的 bullet 维护，FSRS 数据继续使用原有操作流程。
+
 ## 子弹笔记
 
 数据库使用 `bullet` 表以及 `parent_id`、`depth` 和 `sibling_order` 保存子弹笔记的有序森林。
@@ -59,6 +61,8 @@ order by sibling_order;
 检索命中 bullet 后，根据子弹笔记、bullet 引用和当前问题补充上下文。
 
 更新既有 bullet 时，保留其 `id`，使已有关系继续指向同一 bullet。需要新增内容时，创建新的 bullet。
+
+以下结构维护规则同样适用于草稿。日常 bullet 变更使用预览模块的查询模板完成，不在用户确认前直接写入正式 `bullet`、`bullet_reference` 或 `bullet_tag`。
 
 移动子树时，依据新位置调整整棵子树的深度。将节点的父关系变更与必要的深度调整放在同一事务中，使提交后的结构满足 schema。调整同级顺序时，同样利用事务完成整体修改；顺序值只表示先后，不要求连续。
 

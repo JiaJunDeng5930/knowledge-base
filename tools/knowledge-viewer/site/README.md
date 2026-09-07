@@ -1,6 +1,6 @@
 # 知识库阅读器
 
-为 JiaJunDeng5930/knowledge-base 重写的只读网站，部署在仅所有者可访问的 ChatGPT Site。参考 Andy Matuschak 的 working notes，用连续的并排笔记保留探索路径。
+JiaJunDeng5930/knowledge-base 的阅读与变更预览网站，部署在仅所有者可访问的 ChatGPT Site。参考 Andy Matuschak 的 working notes，用连续的并排笔记保留探索路径。
 
 ## 浏览方式
 
@@ -16,9 +16,17 @@
 
 ## 数据边界
 
-权威定义仍是原仓库的 skills/knowledge-base/schema.sql。这里只读取七个固定 Data API 查询，不接受任意表名、SQL、过滤表达式或写入请求。配置保存在服务端，客户端只访问 GET /api/snapshot。使用现有的 Supabase publishable key 及 anon 只读策略，不修改数据库权限。
+核心知识的权威定义仍是原仓库的 skills/knowledge-base/schema.sql。正式快照使用七个固定 Data API 查询；草稿另外读取 bullet_draft。配置保存在服务端，Supabase key 只需要 SELECT 权限。网站不向 Supabase 写入，不接受任意表名、SQL 或过滤表达式。
 
 PostgreSQL bigint 在查询时转为 text。每张表持续分页至空页；刷新失败保留先前内容并提示重试。多个 REST 请求不构成同一数据库事务快照。
+
+## 变更预览与批注
+
+agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建和修改 Supabase 草稿。网站在完整知识浏览界面中，以红色与减号保留原文、绿色与加号显示拟提交内容；移动保留原位置和新位置，直接标签与引用也参与 diff。草稿每次修改始终与首次正式快照比较，只有一个当前值。
+
+正文旁可选择一个或多个 bullet 保存批注。批注经登录与同源校验后写入 D1 的 bullet_review_comment；agent 通过 Sites 数据库工具读取，并根据用户在对话中的要求处理。agent 将完成的批注 ID 与新草稿一同保存，网站再删除对应 D1 行。页面可见时每 8 秒刷新，失败保留已显示内容与尚未保存的输入。正式提交在用户于对话中确认后由 agent 执行。
+
+部署前需在 Supabase 安装一次预览模块的 schema.sql，并保留原正式表只读策略。草稿另用服务端 secret SUPABASE_DRAFT_READ_KEY：schema 中配置其 SHA-256 摘要，RLS 必须验证对应请求头才允许读取，凭据错误会报权限错误。原始凭据不进 Git 或浏览器；具体安装方法见预览子 skill。网站发布时会根据 .openai/hosting.json 创建 DB binding，并应用 drizzle/0000_bullet_review_comment.sql。日常修改草稿和处理批注不需要再部署。
 
 ## 开发与验证
 
@@ -29,10 +37,13 @@ PostgreSQL bigint 在查询时转为 text。每张表持续分页至空页；刷
 - node --test tests/knowledge-reader.test.mjs：检查阅读路径、搜索、模型关系、bigint、分页及失败语义。
 - node --test tests/rendered-html.test.mjs：执行构建后的 Worker，验证中文页面、深层地址和只读 HTTP 接口。
 - node --test tests/reading-content.test.mjs：渲染实际组件，验证完整正文、深层结构、缓存视图、搜索高亮与记忆关联；这不是浏览器交互测试。
+- node --test tests/bullet-review.test.mjs：验证累积 diff、移动原位置、多选批注、D1 实际 SQL 与清理重试语义。
+- node --test tests/*.test.mjs：构建后执行完整测试，包括生产 Worker 的批注登录与同源边界。
+- 原仓库 tools/test_bullet_review.py 生成独立 PostgreSQL schema 内的事务测试，使用 SQL 工具执行后回滚，覆盖草稿保存、提交冲突、临时 ID、结构、引用、标签与 FSRS 保护。
 
 关键代码位于 components/knowledge-reader.tsx、components/reading-view.tsx、components/reader-presentation/、lib/reading-path.ts、lib/reading-highlight.ts、lib/knowledge-model.js 和 lib/supabase-snapshot.ts。原查看器的模型算法保留在 knowledge-model.js，部署适配在 app/api/snapshot/route.ts。
 
-网站通过 Sites 独立源码仓库发布，完整源码同步到 JiaJunDeng5930/knowledge-base 的 tools/knowledge-viewer/site/。本网站不修改核心 schema 或知识数据。
+网站通过 Sites 独立源码仓库发布，完整源码同步到 JiaJunDeng5930/knowledge-base 的 tools/knowledge-viewer/site/。正式知识与 FSRS 保持原有 schema；预览存储独立维护。
 
 ## 阅读呈现模块
 

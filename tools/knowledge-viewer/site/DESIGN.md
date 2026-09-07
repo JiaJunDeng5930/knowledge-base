@@ -1,5 +1,15 @@
 # 知识库阅读器
 
+## Bullet 预览与批注
+
+Supabase 的唯一当前草稿保存固定正式快照 `base`、最新 `proposed` 与累计已处理批注 ID。agent 直接使用 Supabase SQL 工具维护；网站只读取。草稿 RLS 校验服务端专用读取凭据，公共 Supabase key 无法单独读取；凭据错误明确报错，避免被误认为草稿已删除。D1 保存用户在网站上对一条或多条 bullet 写下的批注，agent 使用 Sites 数据库读取工具取得意见。处理意见时在同一 Supabase 更新中保存草稿与已处理 ID，网站随后精确删除对应 D1 行。清理可以重试，读取失败保留旧视图；未完成意见继续显示。日常修改不涉及代码发布。
+
+`lib/bullet-review.ts` 定义传输数据、集合差异和预览快照。`components/bullet-review-context.tsx` 保存读取状态、多选与批注交互。呈现集中在 `reader-presentation/bullet-review.tsx` 和同名 CSS；页内内容块模型保留删除的原文，并为移动或排序变化插入原位置。正文同时显示固定原文和最新拟提交内容，标签和引用显示前后集合，不累积中间版本。选中多个 bullet 后一条意见关联全部选中 ID。
+
+预览范围包括 bullet 正文、结构、直接标签和引用，FSRS 使用正式快照。最终提交只由 agent 在用户确认当前整体 diff 后执行；网站没有正文编辑和正式提交入口。提交校验正式内容仍等于基线，整批变更与草稿删除在同一事务内完成。预览 schema 独立于核心知识定义，不对草稿或批注记录版本历史。
+
+以下各节保留既有阅读设计；其中原有“只读”边界适用于正式知识与 FSRS，网站新增的写入仅限 D1 批注。
+
 ## 页内内容块与引用
 
 `components/reader-presentation/page-content/` 独立承载页内呈现：`model.ts` 把有序子树和两个方向的直接引用转换为内容块及来源分组，`block-list.tsx` 共用圆点、折叠和正文，`reference-list.tsx` 展示来源上下文，`content.tsx` 统一 Markdown 与页内链接，`page-content.css` 统一这些表面的排版。所有视觉值继续属于阅读呈现目录；字体、行高和配色沿用 `reader.css` 的公共变量。

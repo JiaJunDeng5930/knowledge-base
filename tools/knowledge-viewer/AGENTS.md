@@ -10,6 +10,7 @@
 - 同一位置避免放置功能和效果相同的多个按钮。动作优先通过图形、位置与状态表达，减少解释按钮用途的可见文字；仍须保留清楚的可访问名称、键盘焦点和必要的悬停提示。
 - 文字排版应紧凑、自然，统一设计行间距及段落、列表、标题之间的节奏。保留原文、代码和来源上下文，不以截断或重复摘要替代正文阅读。
 - 删除并避免重新加入“xx 条笔记”“xx 个记忆对象”“x 字符”等冗余统计。搜索匹配数量、当前阅读路径位置等直接帮助完成操作的信息可以保留。
+- bullet 变更以整体 diff 叠加在阅读界面，保留原文与最新草稿。用户可对一个或多个 bullet 留批注，通过对话要求 agent 修改；网站不提供正文编辑或正式提交按钮。草稿和批注不版本化。
 
 ## 必须独立维护的架构部分
 
@@ -33,6 +34,12 @@
 | 引用与反向引用的来源路径和原文分组：`PageReferences` | [page-content/reference-list.tsx](site/components/reader-presentation/page-content/reference-list.tsx) |
 | 页内列表、链接、引用的局部尺度、缩进、排版和交互状态 | [page-content/page-content.css](site/components/reader-presentation/page-content/page-content.css) |
 | 按阅读路径保存滚动、折叠、搜索与详情状态：`ReadingViewProvider` | [reading-view.tsx](site/components/reading-view.tsx) |
+| 草稿数据契约、原文与最新草稿比较、包含删除位置的预览快照 | [bullet-review.ts](site/lib/bullet-review.ts) |
+| 草稿与待处理批注的刷新、多选及保存状态 | [bullet-review-context.tsx](site/components/bullet-review-context.tsx) |
+| bullet diff、原位置、变更定位与批注交互及视觉样式 | [bullet-review.tsx](site/components/reader-presentation/bullet-review.tsx)、[bullet-review.css](site/components/reader-presentation/bullet-review.css) |
+| 固定读取 Supabase 当前草稿 | [supabase-draft.ts](site/lib/supabase-draft.ts) |
+| D1 批注保存、重试去重与已处理批注清理 | [bullet-review-store.ts](site/lib/bullet-review-store.ts)、[schema.ts](site/db/schema.ts) |
+| 登录校验、预览读取与同源批注写入 | [预览 API](site/app/api/bullet-review/route.ts)、[批注 API](site/app/api/bullet-review/comments/route.ts) |
 | 页面、目录、搜索、记忆对象与上述模块的组合 | [knowledge-reader.tsx](site/components/knowledge-reader.tsx) |
 | 样式引入与框架主题映射 | [globals.css](site/app/globals.css) |
 
@@ -41,6 +48,8 @@
 ## 数据边界
 
 沿用现有 Supabase 只读快照，遵守根目录对 bullet、引用和 FSRS 多对多关系的定义。数据入口为 [snapshot API](site/app/api/snapshot/route.ts)，读取实现为 [supabase-snapshot.ts](site/lib/supabase-snapshot.ts)。浏览不修改知识、调度状态或复习历史。连接不可用时如实显示空态或错误，仍可继续完善阅读界面。
+
+Supabase `bullet_draft` 只保存唯一草稿的固定 `base`、最新 `proposed` 和累计已处理批注 ID；agent 通过 Supabase SQL 工具读写，网站只有通过专用读取凭据验证后的 SELECT 权限。D1 `bullet_review_comment` 保存网站批注，agent 通过 Sites 工具读取。网站依据草稿中的已处理 ID 清理 D1；两处存储不要求跨库事务。用户明确确认整体 diff 后，agent 才运行正式提交查询。操作约定和查询的唯一入口为 [预览与批注 skill](../../skills/knowledge-base/bullet-review/SKILL.md)。
 
 ## ChatGPT Sites 部署
 
@@ -52,7 +61,8 @@
 | 项目标识的配置来源 | [site/.openai/hosting.json](site/.openai/hosting.json)；复用该项目 |
 | 本仓库的网站源码 | `tools/knowledge-viewer/site/` |
 | 运行与构建 | React / Vinext；Cloudflare Worker 与静态资源；见 [package.json](site/package.json)、[vite.config.ts](site/vite.config.ts) 和 [构建脚本](site/scripts/build-verified.sh) |
-| 数据连接配置 | 服务端运行时环境变量 `SUPABASE_URL`、`SUPABASE_KEY`；空模板见 [site/.env.example](site/.env.example) |
+| 数据连接配置 | 服务端运行时环境变量 `SUPABASE_URL`、`SUPABASE_KEY` 和仅用于草稿读取的 secret `SUPABASE_DRAFT_READ_KEY`；空模板见 [site/.env.example](site/.env.example) |
+| 网站批注存储 | `.openai/hosting.json` 的 D1 binding `DB`；声明式 schema 为 `site/db/schema.ts`，迁移为 `site/drizzle/` |
 
 Sites 使用绑定的独立源码仓库发布，本 GitHub 仓库的 `site/` 保存同一份完整源码。GitHub 同步与 Sites 发布是两项独立操作；更新网站时保持二者的源码一致。
 

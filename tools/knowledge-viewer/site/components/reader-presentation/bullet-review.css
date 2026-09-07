@@ -1,0 +1,64 @@
+/* 变更预览和批注的视觉参数统一在阅读呈现模块内。 */
+:root {
+  --review-added: #176738;
+  --review-added-bg: #eaf6ee;
+  --review-removed: #a72d32;
+  --review-removed-bg: #fff0f0;
+  --review-moved: #856011;
+  --review-selected: #eaf1fb;
+}
+.bullet-review-bar { display:flex; align-items:center; flex-wrap:wrap; gap:.65rem; padding:.55rem 1.1rem; border-bottom:1px solid var(--reader-border, #deded8); font-size:.8rem; background:var(--background); }
+.bullet-review-bar strong { font-weight:600; }
+.bullet-review-legend { display:flex; gap:.6rem; color:var(--review-moved); }
+.bullet-review-legend span:first-child { color:var(--review-removed); }
+.bullet-review-legend span:nth-child(2) { color:var(--review-added); }
+.review-open-comments { margin-left:auto; display:flex; gap:.35rem; align-items:center; }
+.review-open-comments svg { width:1rem; height:1rem; }
+.bullet-review-changes { position:relative; }
+.bullet-review-changes summary { cursor:pointer; }
+.bullet-review-changes > div { position:absolute; top:100%; left:0; z-index:40; display:grid; width:min(24rem,80vw); max-height:20rem; overflow:auto; padding:.5rem; background:var(--background); border:1px solid var(--border); box-shadow:0 6px 20px #0001; }
+.bullet-review-changes button { display:flex; gap:.5rem; padding:.45rem; text-align:left; }
+.bullet-review-changes button:hover { background:var(--review-selected); }
+.bullet-review-error { color:var(--review-removed); }
+.review-bullet { position:relative; min-width:0; }
+.review-bullet[data-comment-selected] { outline:2px solid #6693c2; outline-offset:3px; background:var(--review-selected); }
+.review-bullet-actions { display:flex; align-items:center; justify-content:flex-end; gap:.25rem; min-height:1.6rem; margin-bottom:.1rem; }
+.review-bullet-actions .icon-button { width:1.6rem; height:1.6rem; min-width:1.6rem; min-height:1.6rem; }
+.review-bullet-actions .icon-button svg { width:1rem; height:1rem; }
+.review-bullet-select { width:.95rem; height:.95rem; accent-color:#376b9d; cursor:pointer; }
+.review-comment-count { color:#376b9d; font-size:.75rem; min-width:1.25rem; }
+.bullet-diff-line { display:grid; grid-template-columns:1.25rem minmax(0,1fr); gap:.2rem; padding:.35rem .5rem .35rem .2rem; border-left:3px solid; }
+.bullet-diff-line + .bullet-diff-line { margin-top:2px; }
+.bullet-diff-line--before { border-color:var(--review-removed); background:var(--review-removed-bg); }
+.bullet-diff-line--after { border-color:var(--review-added); background:var(--review-added-bg); }
+.bullet-diff-line--before .bullet-diff-sign { color:var(--review-removed); }
+.bullet-diff-line--after .bullet-diff-sign { color:var(--review-added); }
+.bullet-diff-sign { font-family:var(--reader-font-code); text-align:center; font-weight:600; line-height:1.6; }
+.bullet-diff-caption { display:block; color:var(--review-moved); font-size:.75rem; margin-bottom:.25rem; }
+.bullet-diff-metadata { display:flex; flex-direction:column; gap:.2rem; font-size:.8rem; margin-top:.45rem; overflow-wrap:anywhere; }
+.bullet-diff-metadata button { text-decoration:underline; margin-right:.45rem; text-align:left; }
+.bullet-diff-before { color:var(--review-removed); }
+.bullet-diff-after { color:var(--review-added); }
+.review-change-mark { display:inline-block; font:600 .8rem var(--reader-font-code); margin-left:.35rem; color:var(--review-moved); }
+.review-change-mark[data-change="added"] { color:var(--review-added); }
+.review-change-mark[data-change="deleted"] { color:var(--review-removed); }
+.bullet-comments-dialog { width:min(42rem,calc(100vw - 2rem)); max-width:42rem; max-height:85vh; overflow:auto; }
+.bullet-comment-form { display:grid; gap:.65rem; border-bottom:1px solid var(--border); padding-bottom:1rem; }
+.bullet-comment-form label { font-size:.85rem; }
+.bullet-comment-form textarea { display:block; width:100%; min-height:7rem; border:1px solid var(--border); padding:.65rem; font:inherit; line-height:1.6; resize:vertical; }
+.bullet-comment-form textarea:focus { outline:2px solid #6693c2; outline-offset:2px; }
+.bullet-comment-submit { justify-self:end; padding:.45rem .8rem; background:#285779; color:white; border-radius:4px; }
+.bullet-comment-submit:disabled { opacity:.5; }
+.bullet-comment-targets { display:flex; flex-wrap:wrap; gap:.35rem; font-size:.8rem; }
+.bullet-comment-targets > span { display:flex; align-items:center; gap:.25rem; padding:.1rem .35rem; background:var(--review-selected); }
+.bullet-comment-targets button { text-align:left; color:#285779; }
+.bullet-comment-targets .icon-button { width:1.4rem; height:1.4rem; min-height:1.4rem; min-width:1.4rem; }
+.bullet-pending-comments { display:grid; gap:1rem; }
+.bullet-comment { padding:.7rem 0; border-bottom:1px solid var(--border); }
+.bullet-comment p { white-space:pre-wrap; overflow-wrap:anywhere; margin-top:.5rem; line-height:1.6; }
+.bullet-comments-empty { font-size:.85rem; color:var(--muted-foreground); padding:.5rem 0; }
+@media (max-width:640px) {
+  .bullet-review-bar { padding:.4rem .6rem; gap:.5rem; }
+  .bullet-review-legend { font-size:.7rem; }
+  .bullet-diff-line { grid-template-columns:1rem minmax(0,1fr); padding-right:.3rem; }
+}

@@ -23,6 +23,9 @@ import { IconButton } from "@/components/reader-presentation/icon-button";
 import { readingFontSettings, readingSpineOffset, scrollReadingTarget } from "@/components/reader-presentation/metrics";
 import { useReadingFont } from "@/components/reader-presentation/use-reading-font";
 import type { Bullet, Fsrs, Panel, Review, Snapshot } from "@/lib/knowledge-types";
+import { BulletReviewProvider, useBulletReview } from "@/components/bullet-review-context";
+import { BulletReviewBar, ReviewBulletContent, ReviewChangeMark } from "@/components/reader-presentation/bullet-review";
+import { previewSnapshot } from "@/lib/bullet-review";
 
 type Model = ReturnType<typeof buildKnowledgeModel>;
 const FSRS_STATES = {1: "学习中", 2: "复习中", 3: "重新学习"};
@@ -73,7 +76,7 @@ function KnowledgeLink({id, model, from, navigate, children, preview = true, cla
   const link = <a href={readingUrl([target])} data-reading={selected || undefined} aria-current={selected ? "location" : undefined} className={"knowledge-link " + className} onClick={(event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     event.preventDefault(); navigate(target, from);
-  }}>{children || (bullet ? bulletTitle(bullet.body) : "笔记 " + id)}</a>;
+  }}>{children || (bullet ? bulletTitle(bullet.body) : "笔记 " + id)}<ReviewChangeMark id={id}/></a>;
   if (!preview || !bullet) return link;
   const sub: Bullet[] = model.getChildren(id);
   return <Tooltip delayDuration={450}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="top" align="start" className="note-tooltip"><small>{pathLabel(model, id) || "知识库"} · #{id}</small><p className="preview-body">{searchExcerpt(bullet.body, "", 320)}</p>{!!sub.length && <ul className="preview-children">{sub.slice(0, 3).map(item => <li key={item.id}>{searchExcerpt(item.body, "", 90)}</li>)}</ul>}{selected && <span>已在后文打开</span>}</TooltipContent></Tooltip>;
@@ -94,7 +97,7 @@ function NavigationTree({bullet, model, navigate, activeId, depth = 0}: {bullet:
   return <li className="navigation-node">
     <div ref={rowRef} className="navigation-row" data-active={activeId === bullet.id} style={{"--tree-depth": depth} as CSSProperties}>
       {children.length ? <button className="tree-disclosure" onClick={() => setExpanded(!expanded)} aria-label={(expanded ? "折叠 " : "展开 ") + bulletTitle(bullet.body)} aria-expanded={expanded}>{expanded ? <ChevronDown/> : <ChevronRight/>}</button> : <span className="tree-dot" />}
-      <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}</button>
+      <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}<ReviewChangeMark id={bullet.id}/></button>
     </div>
     {expanded && !!children.length && <ul>{children.map(child => <NavigationTree key={child.id} bullet={child} model={model} navigate={navigate} activeId={activeId} depth={depth + 1}/>)}</ul>}
   </li>;
@@ -246,8 +249,10 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
     {focusError && <p role="status" className="location-message">{focusError}</p>}
     {view.highlight && <div className="search-match-bar" role="region" aria-label="搜索命中"><span title={view.highlight}>“{view.highlight}”</span><small role="status">{matchCount ? Math.min(view.matchIndex + 1, matchCount) + " / " + matchCount : "当前展开内容无匹配"}</small><IconButton label="上一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex - 1)}><ArrowLeft/></IconButton><IconButton label="下一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex + 1)}><ArrowRight/></IconButton><IconButton label="清除搜索高亮" onClick={() => updateView({highlight: "", matchIndex: 0})}><X/></IconButton></div>}
     <div data-bullet-id={id} className="note-opening" data-located={view.focusedId === id}>
+      <ReviewBulletContent {...{id, from, navigate}}>
       {heading ? <h1 className="note-title"><InlineTitle text={heading} query={view.highlight} {...{from, navigate}}/></h1> : <h1 className="sr-only">{bulletTitle(bullet.body, 140)}</h1>}
       <BulletBody body={content} {...{from, navigate}} query={view.highlight}/>
+      </ReviewBulletContent>
     </div>
     {!!tags.length && <div className="note-tags" aria-label="有效标签，包含从祖先继承的标签">{tags.map(tag => <button key={tag} title="包含直接与继承标签" onClick={() => navigate({kind: "tag", tag}, from)}>#{tag}</button>)}</div>}
     {!!children.length && <section className="child-notes">
@@ -406,10 +411,13 @@ function SearchDialog({open, setOpen, model, navigate, active}: {open: boolean; 
 }
 
 function HelpDialog({open, setOpen}: {open: boolean; setOpen: (open: boolean) => void}) {
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>知识库只读。浏览不会修改内容或记录复习。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。圆点在后文独立打开内容块，旁边的三角只展开或收起下级；圆点外的淡色圆环表示下级已折叠。引用与反向引用保留来源路径和完整原文，点击路径可回到上下文。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>浏览不会修改正式知识或记录复习。待提交变更可在正文旁选择一条或多条内容并批注，再回到对话中让 agent 处理。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。圆点在后文独立打开内容块，旁边的三角只展开或收起下级；圆点外的淡色圆环表示下级已折叠。引用与反向引用保留来源路径和完整原文，点击路径可回到上下文。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
 }
 
 function ReaderWorkspace() {
+  const reviewContext = useBulletReview();
+  const draft = reviewContext?.review.draft;
+  const previousDraft = useRef<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [refreshing, setRefreshing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -432,7 +440,8 @@ function ReaderWorkspace() {
   const requestNumber = useRef(0);
   const stackRef = useRef<HTMLDivElement>(null);
   const sheetRefs = useRef(new Map<number, HTMLElement>());
-  const model = useMemo(() => snapshot ? buildKnowledgeModel(snapshot) : null, [snapshot]);
+  const model = useMemo(() => snapshot ? buildKnowledgeModel(draft ? previewSnapshot(snapshot, draft) : snapshot) : null, [snapshot, draft]);
+  const memoryModel = useMemo(() => snapshot ? buildKnowledgeModel(snapshot) : null, [snapshot]);
   panelsRef.current = panels;
   activeRef.current = active;
 
@@ -505,6 +514,11 @@ function ReaderWorkspace() {
       if (requestId === requestNumber.current) setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (previousDraft.current && !draft) void refresh();
+    previousDraft.current = draft?.id || null;
+  }, [draft, refresh]);
 
   useEffect(() => {
     const restorePath = () => {
@@ -597,6 +611,7 @@ function ReaderWorkspace() {
     <ReaderNavigation {...{model, panels, active, navigate}}/>
     <main className="reader-main" id="reading-content">
       <ReadingHeader {...{panels, active, model, activate, navigate, font, changeSize, focused, setFocused, refreshing, error}} search={() => setSearchOpen(true)} size={fontSize} copy={() => void copyLink(active)} copied={copied === active} refresh={() => void refresh()} fetchedAt={snapshot?.fetched_at} help={() => setHelpOpen(true)}/>
+      <BulletReviewBar navigate={navigate}/>
       {error && <div className="error-banner" role="alert"><span>{error}</span><button onClick={() => void refresh()} disabled={refreshing}>重新连接</button></div>}
       <div ref={stackRef} className="reading-stack" data-count={panels.length} data-focus={focused} onScroll={() => {
         if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
@@ -611,8 +626,8 @@ function ReaderWorkspace() {
               {panel.kind === "index" && <IndexPage {...{model, navigate}} from={index}/>}
               {panel.kind === "bullet" && <BulletPage panel={panel} {...{model, navigate}} restorePosition={restoringPath && readingViews.current.has(viewKey)} from={index}/>}
               {(panel.kind === "all" || panel.kind === "tag") && <BulletListPage {...{model, navigate}} from={index} tag={panel.kind === "tag" ? panel.tag : undefined}/>}
-              {panel.kind === "memory" && <MemoryListPage {...{model, navigate, now}} from={index}/>}
-              {panel.kind === "fsrs" && <MemoryPage id={panel.id} {...{model, navigate, now}} from={index}/>}
+              {panel.kind === "memory" && <MemoryListPage model={memoryModel!} {...{navigate, now}} from={index}/>}
+              {panel.kind === "fsrs" && <MemoryPage id={panel.id} model={memoryModel!} {...{navigate, now}} from={index}/>}
             </ReadingViewProvider>
           </article>;
         })}
@@ -626,5 +641,5 @@ function ReaderWorkspace() {
 }
 
 export default function KnowledgeReader() {
-  return <SidebarProvider defaultOpen={false} className="reader-provider"><ReaderWorkspace/></SidebarProvider>;
+  return <SidebarProvider defaultOpen={false} className="reader-provider"><BulletReviewProvider><ReaderWorkspace/></BulletReviewProvider></SidebarProvider>;
 }

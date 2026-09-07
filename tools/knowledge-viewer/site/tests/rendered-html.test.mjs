@@ -35,3 +35,12 @@ test('生产 API 拒绝写入，并对未配置连接返回可重试错误', asy
     assert.equal(response.headers.get('allow'),'GET');
   }
 });
+
+test('批注 API 要求登录，并拒绝从其他网站发起写入', async () => {
+  const get = await worker.fetch(new Request('https://reader.example/api/bullet-review'),bindings,context);
+  assert.equal(get.status,401);
+  const unsigned = await worker.fetch(new Request('https://reader.example/api/bullet-review/comments',{method:'POST'}),bindings,context);
+  assert.equal(unsigned.status,401);
+  const crossSite = await worker.fetch(new Request('https://reader.example/api/bullet-review/comments',{method:'POST',headers:{'oai-authenticated-user-email':'test@example.test',origin:'https://elsewhere.example','content-type':'application/json'},body:'{}'}),bindings,context);
+  assert.equal(crossSite.status,403);
+});

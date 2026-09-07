@@ -1,6 +1,8 @@
 import type { buildKnowledgeModel } from "@/lib/knowledge-model";
 import { bulletTitle, splitBulletContent } from "@/lib/reading-path";
 import type { Bullet, Panel } from "@/lib/knowledge-types";
+import { draftChildren, type BulletDraft } from "@/lib/bullet-review";
+import { compareBigintStrings } from "@/lib/knowledge-model";
 
 export type KnowledgeModel = ReturnType<typeof buildKnowledgeModel>;
 export type Navigate = (panel: Panel, from?: number) => void;
@@ -13,6 +15,7 @@ export type PageBlock = {
   content: string;
   available: boolean;
   children: PageBlock[];
+  reviewSide?: "before";
 };
 export type BlockSurface = {kind: "body"} | {kind: "reference"; key: string};
 export type ReferenceDirection = "outgoing" | "incoming";
@@ -29,20 +32,30 @@ export type ReferenceSection = {
 };
 
 // 正文与引用只共用呈现模型；引用边不成为有序子树的一部分。
-function buildBlock(model: KnowledgeModel, id: string, ancestors: Set<string>): PageBlock | null {
+function buildBlock(model: KnowledgeModel, id: string, ancestors: Set<string>, draft?: BulletDraft | null, beforeOnly = false): PageBlock | null {
   if (ancestors.has(id)) return null;
-  const bullet: Bullet | undefined = model.bulletsById.get(id);
+  const bullet: Bullet | undefined = beforeOnly && draft?.base[id] ? {id, ...draft.base[id]} : model.bulletsById.get(id);
   if (!bullet) return {id, title: "内容 #" + id, heading: null, content: "", available: false, children: []};
   const path = new Set(ancestors).add(id);
-  const children = (model.getChildren(id) as Bullet[])
-    .map(child => buildBlock(model, child.id, path)).filter((child): child is PageBlock => child !== null);
-  return {id, title: bulletTitle(bullet.body), ...splitBulletContent(bullet.body), available: true, children};
+  const children = buildChildren(model, id, path, draft, beforeOnly);
+  return {id, title: bulletTitle(bullet.body), ...splitBulletContent(bullet.body), available: true, children, ...(beforeOnly ? {reviewSide: "before" as const} : {})};
 }
 
-export function buildPageBlocks(model: KnowledgeModel, parentId: string): PageBlock[] {
-  return (model.getChildren(parentId) as Bullet[])
-    .map(bullet => buildBlock(model, bullet.id, new Set([parentId])))
+function buildChildren(model: KnowledgeModel, parentId: string, ancestors: Set<string>, draft?: BulletDraft | null, beforeOnly = false): PageBlock[] {
+  const bullets: Bullet[] = beforeOnly && draft ? draftChildren(draft.base, parentId) : model.getChildren(parentId);
+  const rows = bullets.map(bullet => ({bullet, beforeOnly}));
+  if (draft && !beforeOnly) for (const bullet of draftChildren(draft.base, parentId)) {
+    const after = draft.proposed[bullet.id];
+    if (after && (after.parent_id !== parentId || after.sibling_order !== bullet.sibling_order)) rows.push({bullet, beforeOnly: true});
+  }
+  return rows.sort((a, b) => compareBigintStrings(a.bullet.sibling_order, b.bullet.sibling_order)
+    || compareBigintStrings(a.bullet.id, b.bullet.id) || Number(b.beforeOnly) - Number(a.beforeOnly))
+    .map(({bullet, beforeOnly}) => buildBlock(model, bullet.id, ancestors, draft, beforeOnly))
     .filter((block): block is PageBlock => block !== null);
+}
+
+export function buildPageBlocks(model: KnowledgeModel, parentId: string, draft?: BulletDraft | null): PageBlock[] {
+  return buildChildren(model, parentId, new Set([parentId]), draft);
 }
 
 export function buildReferenceSections(model: KnowledgeModel, id: string): ReferenceSection[] {

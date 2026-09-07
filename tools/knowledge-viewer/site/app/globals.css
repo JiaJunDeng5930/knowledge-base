@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 @import "../components/reader-presentation/reader.css";
+@import "../components/reader-presentation/bullet-review.css";
 
 /* 框架入口只保留工具和主题映射；阅读视觉统一在 reader-presentation。 */
 @utility scrollbar-thin { scrollbar-width: thin; }

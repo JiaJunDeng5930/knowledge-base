@@ -3,6 +3,7 @@ declare namespace Cloudflare {
   interface Env {
     SUPABASE_URL?: string;
     SUPABASE_KEY?: string;
+    SUPABASE_DRAFT_READ_KEY?: string;
     DB?: D1Database;
   }
 }
