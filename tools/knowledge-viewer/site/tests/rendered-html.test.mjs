@@ -17,7 +17,7 @@ test('生产入口渲染中文阅读界面和站点元数据', async () => {
     assert.equal(response.status,200,path);
     const html=await response.text();
     assert.match(html,/知识库/);
-    assert.match(html,/知识索引/);
+    assert.match(html,/阅读设置/);
     assert.match(html,/正在打开知识库/);
     assert.match(html,/<html[^>]*lang="zh-CN"/);
     assert.doesNotMatch(html,/Starter Project|codex-preview|Ship something real/);
