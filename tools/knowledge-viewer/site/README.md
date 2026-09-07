@@ -22,7 +22,7 @@ PostgreSQL bigint 在查询时转为 text。每张表持续分页至空页；刷
 
 ## 变更预览与批注
 
-agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建和修改 Supabase 草稿。网站在完整知识浏览界面中，以红色与减号保留原文、绿色与加号显示拟提交内容；移动保留原位置和新位置，直接标签与引用也参与 diff。草稿每次修改始终与首次正式快照比较，只有一个当前值。
+agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建和修改 Supabase 草稿。网站在完整知识浏览界面中，以红色与减号保留原文、绿色与加号显示拟提交内容；移动保留原位置和新位置，直接标签与引用也参与 diff。草稿每次修改始终与首次正式快照比较，只有一个当前值。左侧目录用颜色与状态图标标示新增、修改、删除和移动，折叠的上级保留变更提示。
 
 右上角的批注图标开启直接选择；单击正文写批注，Ctrl / Command 点击增减选择。批注在邻近浮层保存，已有意见通过正文旁的小图标查看。Esc 关闭浮层，再次按下退出批注模式；Ctrl / Command + Enter 保存。批注经登录与同源校验后写入 D1 的 bullet_review_comment；agent 通过 Sites 数据库工具读取，并根据用户在对话中的要求处理。agent 将完成的批注 ID 与新草稿一同保存，网站再删除对应 D1 行。页面可见时每 8 秒刷新，失败保留已显示内容与尚未保存的输入。正式提交在用户于对话中确认后由 agent 执行。
 
@@ -50,3 +50,5 @@ agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建�
 所有影响阅读视觉的选择集中在 components/reader-presentation/。reader.css 顶部的 :root 定义字体、字号层次、四种行高（正文、标题、界面、代码）、配色、间距、页宽、缩进、书脊、图标、热区和表面效果；页内 bullet、链接与反向引用进一步集中在 page-content/：model.ts 定义块及来源分组，block-list.tsx 与 reference-list.tsx 共用块呈现，content.tsx 处理 Markdown 和链接，page-content.css 定义局部尺度、缩进和交互状态。正文与引用共享字体和行高，引用的展开状态单独保存。其余样式与响应式规则保留在 reader.css。app/globals.css 只负责引入和框架映射。
 
 metrics.ts 读取 CSS 的实际布局值，避免 JS 与 CSS 维护两套书脊尺寸或断点。use-reading-font.ts 管理本设备字号偏好，并使正文与浮层同步。icon-button.tsx 统一动作按钮的语义、名称和提示。业务组件只传递内容层级和页序；不再写字号、颜色、行高、间距或图标大小。第三方 components/ui 保持原样。
+
+批注与 diff 的程序实体、模块职责及源码入口见 [AGENTS.md](AGENTS.md)。

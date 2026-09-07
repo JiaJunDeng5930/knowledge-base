@@ -10,9 +10,11 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const bundle=buildSync({stdin:{contents:`
 export * from './lib/bullet-review';
+export * from './lib/bullet-diff';
 export * from './lib/bullet-review-store';
 export * from './lib/supabase-draft';
-export * from './components/reader-presentation/bullet-review';
+export * from './components/reader-presentation/bullet-diff';
+export * from './components/reader-presentation/bullet-annotations';
 export * from './components/reader-presentation/page-content/model';
 export * from './components/reader-presentation/page-content/block-list';
 export * from './components/bullet-review-context';
@@ -22,7 +24,7 @@ export {buildKnowledgeModel} from './lib/knowledge-model';
 const directory=mkdtempSync(root+'node_modules/.bullet-review-test-');
 let code;
 try {writeFileSync(directory+'/bundle.mjs',bundle);code=await import(pathToFileURL(directory+'/bundle.mjs').href);} finally {rmSync(directory,{recursive:true,force:true});}
-const {bulletChanges,previewSnapshot,parseBulletDraft,readBulletReview,saveReviewComment,parseCommentInput,fetchSupabaseDraft,buildKnowledgeModel,buildPageBlocks,ReviewBulletContent,PageBulletList,BulletReviewContext,ReadingViewProvider}=code;
+const {bulletChanges,bulletChangedAncestors,BulletDiffNavigationLabel,previewSnapshot,parseBulletDraft,readBulletReview,saveReviewComment,parseCommentInput,fetchSupabaseDraft,buildKnowledgeModel,buildPageBlocks,BulletDiffContent,PageBulletList,BulletReviewContext,ReadingViewProvider}=code;
 const row=(body,parent_id=null,depth=0,sibling_order='1')=>({body,parent_id,depth,sibling_order,tags:[],references:[]});
 const empty={bullets:[],references:[],effective_tags:[],fsrs:[],fsrs_bullet:[],fsrs_review:[],scheduler_configs:[],fetched_at:'2026-09-07T00:00:00Z'};
 const draft=(base,proposed=structuredClone(base))=>({id:'00000000-0000-4000-8000-000000000111',base,proposed,processed_comment_ids:[],updated_at:'2026-09-07T00:00:00Z'});
@@ -76,8 +78,31 @@ test('真实组件渲染原文和最新草稿、直接选择及原位置，保�
   const html=renderToStaticMarkup(React.createElement(BulletReviewContext.Provider,{value:context},React.createElement(ReadingViewProvider,{viewKey:'test',cache:new Map()},React.createElement(PageBulletList,{parentId:'1',model,from:0,navigate(){}}))));
   assert.match(html,/a 原文/);assert.match(html,/b <strong>最新草稿<\/strong>/);assert.doesNotMatch(html,/c 中间版本/);
   assert.doesNotMatch(html,/type="checkbox"/);assert.match(html,/data-annotation-target="2"[^>]*data-comment-selected="true"/);assert.match(html,/删除的原文/);assert.match(html,/拟提交内容/);
-  const unchanged=renderToStaticMarkup(React.createElement(ReviewBulletContent,{id:'2',from:0,navigate(){}},'原阅读内容'));
+  const unchanged=renderToStaticMarkup(React.createElement(BulletDiffContent,{id:'2',from:0,navigate(){}},'原阅读内容'));
   assert.equal(unchanged,'原阅读内容');
+});
+
+test('目录区分本条差异与下级变化，移动同时标记原分支和目标分支',()=>{
+  const value=draft({'1':row('根'),'2':row('原分支','1',1),'3':row('目标分支','1',1,'2'),'4':row('移动内容','2',2),'5':row('无变化','1',1,'3'),'6':row('删除内容','2',2,'2')});
+  value.proposed['4'].parent_id='3';
+  value.proposed['4'].body='移动后补充正文';
+  value.proposed['2'].tags=['working'];
+  value.proposed['-1']=row('新增内容','3',2,'2');
+  delete value.proposed['6'];
+  const changes=bulletChanges(value),changedAncestors=bulletChangedAncestors(value,changes);
+  assert.deepEqual([...changedAncestors].sort(),['1','2','3']);
+  const context={review:{draft:value,comments:[]},changes,changedAncestors};
+  const render=id=>renderToStaticMarkup(React.createElement(BulletReviewContext.Provider,{value:context},React.createElement(BulletDiffNavigationLabel,{id},(value.proposed[id]||value.base[id]).body)));
+  for(const [id,kind] of [['-1','added'],['2','modified'],['4','moved'],['6','deleted']]) {
+    const html=render(id);assert.ok(html.includes('data-change="'+kind+'"'));assert.match(html,/<svg/);
+  }
+  assert.match(render('4'),/位置已调整；正文已修改/);
+  assert.match(render('2'),/标签已修改/);
+  assert.match(render('1'),/data-descendant-change="true"/);
+  assert.match(render('3'),/下级有待提交变更/);
+  assert.doesNotMatch(render('5'),/data-change=|data-descendant-change=|<svg/);
+  value.proposed=structuredClone(value.base);
+  assert.equal(bulletChangedAncestors(value).size,0);
 });
 
 test('真实 D1 SQL 保存跨 bullet 批注；重复发送幂等，处理后只删除指定批注',async()=>{

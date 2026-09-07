@@ -24,7 +24,8 @@ import { readingFontSettings, readingSpineOffset, scrollReadingTarget } from "@/
 import { useReadingFont } from "@/components/reader-presentation/use-reading-font";
 import type { Bullet, Fsrs, Panel, Review, Snapshot } from "@/lib/knowledge-types";
 import { BulletReviewProvider, useBulletReview } from "@/components/bullet-review-context";
-import { BulletAnnotationControl, BulletCommentPin, ReviewBulletContent, ReviewChangeMark, ReviewChangesMenu, useBulletAnnotation } from "@/components/reader-presentation/bullet-review";
+import { BulletAnnotationControl, BulletCommentPin, useBulletAnnotation } from "@/components/reader-presentation/bullet-annotations";
+import { BulletDiffContent, BulletDiffMark, BulletDiffMenu, BulletDiffNavigationLabel } from "@/components/reader-presentation/bullet-diff";
 import { previewSnapshot } from "@/lib/bullet-review";
 
 type Model = ReturnType<typeof buildKnowledgeModel>;
@@ -76,7 +77,7 @@ function KnowledgeLink({id, model, from, navigate, children, preview = true, cla
   const link = <a href={readingUrl([target])} data-reading={selected || undefined} aria-current={selected ? "location" : undefined} className={"knowledge-link " + className} onClick={(event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     event.preventDefault(); navigate(target, from);
-  }}>{children || (bullet ? bulletTitle(bullet.body) : "笔记 " + id)}<ReviewChangeMark id={id}/></a>;
+  }}>{children || (bullet ? bulletTitle(bullet.body) : "笔记 " + id)}<BulletDiffMark id={id}/></a>;
   if (!preview || !bullet) return link;
   const sub: Bullet[] = model.getChildren(id);
   return <Tooltip delayDuration={450}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="top" align="start" className="note-tooltip"><small>{pathLabel(model, id) || "知识库"} · #{id}</small><p className="preview-body">{searchExcerpt(bullet.body, "", 320)}</p>{!!sub.length && <ul className="preview-children">{sub.slice(0, 3).map(item => <li key={item.id}>{searchExcerpt(item.body, "", 90)}</li>)}</ul>}{selected && <span>已在后文打开</span>}</TooltipContent></Tooltip>;
@@ -97,7 +98,7 @@ function NavigationTree({bullet, model, navigate, activeId, depth = 0}: {bullet:
   return <li className="navigation-node">
     <div ref={rowRef} className="navigation-row" data-active={activeId === bullet.id} style={{"--tree-depth": depth} as CSSProperties}>
       {children.length ? <button className="tree-disclosure" onClick={() => setExpanded(!expanded)} aria-label={(expanded ? "折叠 " : "展开 ") + bulletTitle(bullet.body)} aria-expanded={expanded}>{expanded ? <ChevronDown/> : <ChevronRight/>}</button> : <span className="tree-dot" />}
-      <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}<ReviewChangeMark id={bullet.id}/></button>
+      <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}><BulletDiffNavigationLabel id={bullet.id}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}</BulletDiffNavigationLabel></button>
     </div>
     {expanded && !!children.length && <ul>{children.map(child => <NavigationTree key={child.id} bullet={child} model={model} navigate={navigate} activeId={activeId} depth={depth + 1}/>)}</ul>}
   </li>;
@@ -147,7 +148,7 @@ function ReadingHeader({panels, active, model, activate, navigate, search, font,
           <div className="font-control"><span>Aa</span><output aria-label="当前字号">{size ?? font?.defaultSize}</output><IconButton label="缩小字号" disabled={!font || size === null || size <= font.min} onClick={() => size !== null && changeSize(size - 1)}><Minus/></IconButton><IconButton label="恢复默认字号" disabled={!font || size === font.defaultSize} onClick={() => font && changeSize(font.defaultSize)}><RotateCcw/></IconButton><IconButton label="放大字号" disabled={!font || size === null || size >= font.max} onClick={() => size !== null && changeSize(size + 1)}><Plus/></IconButton></div>
           <div className="preference-actions"><IconButton label={copied ? "已复制阅读路径" : "复制到当前篇的阅读路径"} onClick={copy}>{copied ? <Check/> : <Copy/>}</IconButton>{!focused && <IconButton label="专注阅读当前篇" onClick={() => setFocused(true)}><Maximize2/></IconButton>}<IconButton label="刷新知识库" onClick={refresh} disabled={refreshing}><RefreshCw/></IconButton><IconButton label="阅读帮助与快捷键" onClick={help}><CircleHelp/></IconButton></div>
           <small className="connection-status" role="status">{error ? "连接暂不可用" : refreshing ? "正在读取…" : fetchedAt ? "更新于 " + dateText(fetchedAt, true) : "尚未连接"}</small>
-          <ReviewChangesMenu navigate={navigate}/>
+          <BulletDiffMenu navigate={navigate}/>
         </PopoverContent></Popover>
         <BulletAnnotationControl navigate={navigate} compact={isMobile}/>
       </div>
@@ -253,10 +254,10 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
     {focusError && <p role="status" className="location-message">{focusError}</p>}
     {view.highlight && <div className="search-match-bar" role="region" aria-label="搜索命中"><span title={view.highlight}>“{view.highlight}”</span><small role="status">{matchCount ? Math.min(view.matchIndex + 1, matchCount) + " / " + matchCount : "当前展开内容无匹配"}</small><IconButton label="上一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex - 1)}><ArrowLeft/></IconButton><IconButton label="下一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex + 1)}><ArrowRight/></IconButton><IconButton label="清除搜索高亮" onClick={() => updateView({highlight: "", matchIndex: 0})}><X/></IconButton></div>}
     <div data-bullet-id={id} className="note-opening" data-located={view.focusedId === id} {...annotation}>
-      <ReviewBulletContent {...{id, from, navigate}} opening>
+      <BulletDiffContent {...{id, from, navigate}} opening>
       {heading ? <h1 className="note-title"><InlineTitle text={heading} query={view.highlight} {...{from, navigate}}/></h1> : <h1 className="sr-only">{bulletTitle(bullet.body, 140)}</h1>}
       <BulletBody body={content} {...{from, navigate}} query={view.highlight}/>
-      </ReviewBulletContent>
+      </BulletDiffContent>
       <BulletCommentPin id={id}/>
     </div>
     {!!tags.length && <div className="note-tags" aria-label="有效标签，包含从祖先继承的标签">{tags.map(tag => <button key={tag} title="包含直接与继承标签" onClick={() => navigate({kind: "tag", tag}, from)}>#{tag}</button>)}</div>}

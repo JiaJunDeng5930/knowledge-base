@@ -37,7 +37,7 @@
 | `AGENTS.md` | 记录工程目标、稳定概念、目录职责和扩展边界。 |
 | `skills/knowledge-base/schema.sql` | 核心知识模型的唯一权威声明式 schema，随通用 skill 保存。 |
 | `tools/` | 开发、检查和维护本仓库时使用的辅助工具。认知活动中操作知识库的工具不放在这里。 |
-| `tools/knowledge-viewer/` | 知识库查看器。`site/` 保存当前 ChatGPT Sites 网站的完整源码、构建配置和测试，并提供 bullet 草稿 diff 与 D1 批注；网站只读取 Supabase。`run`、`server.py` 与 `public/` 保留旧只读本地实现。 |
+| `tools/knowledge-viewer/` | 知识库查看器。`site/` 保存当前 ChatGPT Sites 网站的完整源码、构建配置和测试，并提供 bullet 草稿 diff 与 D1 批注；网站只读取 Supabase。批注与 diff 的程序实体见[网站架构索引](tools/knowledge-viewer/site/AGENTS.md)。`run`、`server.py` 与 `public/` 保留旧只读本地实现。 |
 | `skills/knowledge-base/` | 整个知识库的通用 skill 所在目录，以 `SKILL.md` 为入口；`fsrs/SKILL.md` 提供按需加载的 FSRS 数据知识，计算脚本位于 `fsrs/scripts/`；`bullet-review/SKILL.md` 规定预览、批注与确认后提交，其 schema 和 SQL 查询保存在同一模块。 |
 | `skills/scenarios/` | 各类认知活动的场景 skill 所在目录。每个场景使用独立子目录，并在自己的目录中保存该场景使用的知识库操作工具。 |
 

@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { bulletChanges, parseBulletDraft, type BulletReview, type ReviewComment } from "@/lib/bullet-review";
+import { parseBulletDraft, type BulletReview, type ReviewComment } from "@/lib/bullet-review";
+
+import { bulletChanges, bulletChangedAncestors } from "@/lib/bullet-diff";
 
 export type BulletReviewContextValue = {
-  review: BulletReview; changes: ReturnType<typeof bulletChanges>; error: string | null;
+  review: BulletReview; changedAncestors: Set<string>; changes: ReturnType<typeof bulletChanges>; error: string | null;
   selected: string[]; setSelected: (ids: string[]) => void;
   annotationMode: boolean; setAnnotationMode: (active: boolean) => void;
   anchor: HTMLElement | null; setAnchor: (anchor: HTMLElement | null) => void;
@@ -73,5 +75,6 @@ export function BulletReviewProvider({children}: {children: ReactNode}) {
     } finally {setSavingComment(false);}
   }, [apply]);
   const changes = useMemo(() => review.draft ? bulletChanges(review.draft) : new Map(), [review.draft]);
-  return <BulletReviewContext.Provider value={{review, changes, error, selected, setSelected, annotationMode, setAnnotationMode, anchor, setAnchor, focusComment, setFocusComment, savingComment, commentsOpen, setCommentsOpen, refresh, saveComment}}>{children}</BulletReviewContext.Provider>;
+  const changedAncestors = useMemo(() => review.draft ? bulletChangedAncestors(review.draft, changes) : new Set<string>(), [review.draft, changes]);
+  return <BulletReviewContext.Provider value={{review, changes, changedAncestors, error, selected, setSelected, annotationMode, setAnnotationMode, anchor, setAnchor, focusComment, setFocusComment, savingComment, commentsOpen, setCommentsOpen, refresh, saveComment}}>{children}</BulletReviewContext.Provider>;
 }

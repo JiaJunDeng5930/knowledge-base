@@ -21,6 +21,8 @@
 
 当用户要求把某个功能、概念或呈现方式作为源码中的专门部分实现时，必须在同一次修改中主动补充或更新本文件的索引，写明该部分的职责和实际源码入口，无须用户再次提醒。后续移动、重命名、重构或职责变化时，同步维护对应索引。
 
+批注和 diff 必须分别由独立模块承载，页面只组合组件；[网站 AGENTS.md](site/AGENTS.md) 记录程序实体、依赖关系和各模块负责的规则。
+
 下表路径均相对于本文件所在目录。
 
 | 需求或职责 | 源码入口 |
@@ -35,9 +37,11 @@
 | 引用与反向引用的来源路径和原文分组：`PageReferences` | [page-content/reference-list.tsx](site/components/reader-presentation/page-content/reference-list.tsx) |
 | 页内列表、链接、引用的局部尺度、缩进、排版和交互状态 | [page-content/page-content.css](site/components/reader-presentation/page-content/page-content.css) |
 | 按阅读路径保存滚动、折叠、搜索与详情状态：`ReadingViewProvider` | [reading-view.tsx](site/components/reading-view.tsx) |
-| 草稿数据契约、原文与最新草稿比较、包含删除位置的预览快照 | [bullet-review.ts](site/lib/bullet-review.ts) |
+| 草稿与批注传输契约、草稿校验、包含删除位置的预览快照 | [bullet-review.ts](site/lib/bullet-review.ts) |
 | 草稿与待处理批注的刷新、批注模式、多选与保存状态 | [bullet-review-context.tsx](site/components/bullet-review-context.tsx) |
-| bullet diff、原位置、设置内变更定位；直接选择、圆点反馈、非模态批注浮层：`useBulletAnnotation`、`BulletAnnotationControl`、`BulletCommentPopover` | [bullet-review.tsx](site/components/reader-presentation/bullet-review.tsx)、[bullet-review.css](site/components/reader-presentation/bullet-review.css) |
+| 独立差异模型：`BulletChange`、`bulletChanges`、`bulletChangedAncestors` | [lib/bullet-diff.ts](site/lib/bullet-diff.ts) |
+| 独立 diff 呈现模块：正文、原位置、关联、目录名称颜色与状态图标；`BulletDiffContent`、`BulletDiffNavigationLabel` | [bullet-diff.tsx](site/components/reader-presentation/bullet-diff.tsx)、[bullet-diff.css](site/components/reader-presentation/bullet-diff.css) |
+| 独立批注交互模块：直接选择、多选、圆点反馈、批注浮层；`useBulletAnnotation`、`BulletAnnotationControl`、`BulletCommentPopover` | [bullet-annotations.tsx](site/components/reader-presentation/bullet-annotations.tsx)、[bullet-annotations.css](site/components/reader-presentation/bullet-annotations.css) |
 | 固定读取 Supabase 当前草稿 | [supabase-draft.ts](site/lib/supabase-draft.ts) |
 | D1 批注保存、重试去重与已处理批注清理 | [bullet-review-store.ts](site/lib/bullet-review-store.ts)、[schema.ts](site/db/schema.ts) |
 | 登录校验、预览读取与同源批注写入 | [预览 API](site/app/api/bullet-review/route.ts)、[批注 API](site/app/api/bullet-review/comments/route.ts) |

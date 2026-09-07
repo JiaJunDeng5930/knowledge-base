@@ -7,7 +7,6 @@ export type DraftDocument = Record<string, DraftBullet>;
 export type BulletDraft = {id: string; base: DraftDocument; proposed: DraftDocument; processed_comment_ids: string[]; updated_at: string};
 export type ReviewComment = {id: string; draft_id: string; bullet_ids: string[]; body: string; created_at: string};
 export type BulletReview = {draft: BulletDraft | null; comments: ReviewComment[]};
-export type BulletChange = {id: string; before?: DraftBullet; after?: DraftBullet; kind: "added" | "deleted" | "modified" | "moved"; bodyChanged: boolean; moved: boolean; tagsChanged: boolean; referencesChanged: boolean};
 
 const integer = /^(0|-?[1-9][0-9]*)$/;
 function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every(x => typeof x === "string"); }
@@ -32,23 +31,6 @@ export function parseBulletDraft(value: unknown): BulletDraft {
   if (!draft || typeof draft.id !== "string" || !isDocument(draft.base) || !isDocument(draft.proposed)
       || !isStringArray(draft.processed_comment_ids) || typeof draft.updated_at !== "string") throw new Error("Bullet draft invalid response");
   return draft;
-}
-
-function sameSet(a: string[], b: string[]) { return a.length === b.length && a.every(x => b.includes(x)); }
-export function bulletChanges(draft: BulletDraft): Map<string, BulletChange> {
-  const changes = new Map<string, BulletChange>();
-  for (const id of new Set([...Object.keys(draft.base), ...Object.keys(draft.proposed)])) {
-    const before = draft.base[id], after = draft.proposed[id];
-    const bodyChanged = before?.body !== after?.body;
-    const moved = !!before && !!after && (before.parent_id !== after.parent_id || before.sibling_order !== after.sibling_order);
-    const tagsChanged = !sameSet(before?.tags || [], after?.tags || []);
-    const referencesChanged = !sameSet(before?.references || [], after?.references || []);
-    if (!before || !after || bodyChanged || moved || tagsChanged || referencesChanged) changes.set(id, {
-      id, before, after, bodyChanged, moved, tagsChanged, referencesChanged,
-      kind: !before ? "added" : !after ? "deleted" : moved ? "moved" : "modified",
-    });
-  }
-  return changes;
 }
 
 export function draftSnapshot(snapshot: Snapshot, document: DraftDocument): Snapshot {

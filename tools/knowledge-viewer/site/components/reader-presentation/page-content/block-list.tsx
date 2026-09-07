@@ -4,7 +4,8 @@ import { useMemo, type CSSProperties } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useReadingView } from "@/components/reading-view";
 import { useBulletReview } from "@/components/bullet-review-context";
-import { BulletCommentPin, ReviewBulletContent, useBulletAnnotation } from "../bullet-review";
+import { BulletCommentPin, useBulletAnnotation } from "../bullet-annotations";
+import { BulletDiffContent } from "../bullet-diff";
 import { BulletBody, PageLink } from "./content";
 import { blockExpansionKey, buildPageBlocks, type BlockSurface, type KnowledgeModel, type Navigate, type PageBlock } from "./model";
 
@@ -43,11 +44,11 @@ function BlockRow({block, surface, from, navigate, depth}: {block: PageBlock; su
         <span className="page-block-dot" aria-hidden="true"/>
       </PageLink> : <span className="page-block-unavailable-dot" aria-hidden="true"><span className="page-block-dot"/></span>}
       <div className="page-block-content">
-        <ReviewBulletContent id={block.id} beforeOnly={block.reviewSide === "before"} {...{from, navigate}}>
+        <BulletDiffContent id={block.id} beforeOnly={block.reviewSide === "before"} {...{from, navigate}}>
         {block.heading && <div className="page-block-heading"><BulletBody body={block.heading} {...{from, navigate, query}}/></div>}
         {block.content && <BulletBody body={block.content} {...{from, navigate, query}}/>}
         {!block.available && <p className="page-block-unavailable">{block.title} 暂不可用</p>}
-        </ReviewBulletContent>
+        </BulletDiffContent>
       </div>
       {inBody && <BulletCommentPin id={block.id}/>}
     </div>
