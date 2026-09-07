@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { MessageSquare, MessageSquarePlus, RefreshCw, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, ArrowUp, ChevronDown, Link2, LoaderCircle, MessageSquare, RefreshCw, X } from "lucide-react";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useBulletReview } from "@/components/bullet-review-context";
-import { bulletTitle } from "@/lib/reading-path";
-import { draftChildren, type DraftDocument } from "@/lib/bullet-review";
-import { BulletBody } from "./page-content/content";
+import { bulletTitle, splitBulletContent } from "@/lib/reading-path";
+import { createReviewCommentId, draftChildren, type DraftDocument } from "@/lib/bullet-review";
+import { BulletBody, InlineTitle } from "./page-content/content";
 import type { Navigate } from "./page-content/model";
 import { IconButton } from "./icon-button";
 
@@ -21,92 +21,180 @@ export function ReviewChangeMark({id}: {id: string}) {
   const change = useBulletReview()?.changes.get(id);
   if (!change) return null;
   const labels = {added: "新增", deleted: "删除", modified: "修改", moved: "移动"};
-  return <span className="review-change-mark" data-change={change.kind} aria-label={labels[change.kind]} title={labels[change.kind]}>{change.kind === "added" ? "+" : change.kind === "deleted" ? "−" : change.kind === "moved" ? "↪" : "±"}</span>;
+  return <span className="review-change-mark" data-change={change.kind} aria-label={labels[change.kind]} title={labels[change.kind]}>{change.kind === "added" ? "+" : change.kind === "deleted" ? "−" : change.kind === "moved" ? <ArrowRight/> : "·"}</span>;
 }
 
-export function ReviewBulletContent({id, from, navigate, children, beforeOnly = false, selectable = true}: {
-  id: string; from: number; navigate: Navigate; children: ReactNode; beforeOnly?: boolean; selectable?: boolean;
+// 热区止于本条正文；下级列表和折叠按钮保留各自的操作。
+export function useBulletAnnotation(id: string, enabled = true): HTMLAttributes<HTMLElement> & {"data-annotation-target"?: string; "data-comment-selected"?: boolean} {
+  const context = useBulletReview();
+  if (!enabled || !context?.review.draft) return {};
+  const active = context.annotationMode;
+  const choose = (element: HTMLElement, multiple: boolean) => {
+    if (context.savingComment) return;
+    const selected = multiple ? context.selected.includes(id) ? context.selected.filter(value => value !== id) : [...context.selected, id] : [id];
+    context.setSelected(selected);
+    if (!multiple || !context.commentsOpen) context.setAnchor(element);
+    else if (!selected.includes(context.anchor?.getAttribute("data-annotation-target") || "")) {
+      context.setAnchor(selected.length ? document.querySelector<HTMLElement>('[data-annotation-target="' + selected[0] + '"]') : null);
+    }
+    context.setFocusComment(!multiple);
+    context.setCommentsOpen(selected.length > 0);
+  };
+  const title = bulletTitle((context.review.draft.proposed[id] || context.review.draft.base[id])?.body || "");
+  const ignored = (target: EventTarget) => target instanceof Element && !!target.closest(".page-block-toggle, .bullet-comment-pin");
+  return {
+    "data-annotation-target": id,
+    "data-comment-selected": active && context.selected.includes(id) || undefined,
+    tabIndex: active ? 0 : undefined,
+    role: active ? "button" : undefined,
+    "aria-label": active ? "批注：" + title : undefined,
+    "aria-pressed": active ? context.selected.includes(id) : undefined,
+    onClickCapture: event => {
+      if (!active || ignored(event.target)) return;
+      event.preventDefault(); event.stopPropagation(); choose(event.currentTarget, event.ctrlKey || event.metaKey);
+    },
+    onKeyDownCapture: event => {
+      if (!active || !["Enter", " "].includes(event.key) || ignored(event.target)) return;
+      event.preventDefault(); event.stopPropagation(); choose(event.currentTarget, event.ctrlKey || event.metaKey);
+    },
+  };
+}
+
+export function BulletCommentPin({id}: {id: string}) {
+  const context = useBulletReview();
+  const count = context?.review.comments.filter(comment => comment.bullet_ids.includes(id)).length || 0;
+  if (!context || !count) return null;
+  return <IconButton className="bullet-comment-pin" disabled={context.savingComment} label={"查看批注 · " + count} onClick={event => {
+    context.setAnnotationMode(true); context.setSelected([id]);
+    context.setAnchor(event.currentTarget.closest<HTMLElement>("[data-annotation-target]"));
+    context.setFocusComment(false); context.setCommentsOpen(true);
+  }}><MessageSquare/></IconButton>;
+}
+
+// 纯文本的局部替换嵌入原句；Markdown 块仍由原有渲染器完整呈现。
+function InlineBodyDiff({before, after}: {before: string; after: string}) {
+  const left = Array.from(before), right = Array.from(after);
+  let start = 0, end = 0;
+  while (start < left.length && start < right.length && left[start] === right[start]) start++;
+  while (end < left.length - start && end < right.length - start && left[left.length - end - 1] === right[right.length - end - 1]) end++;
+  return <p className="bullet-diff-inline">{left.slice(0, start).join("")}<del aria-label="删除的原文">{left.slice(start, left.length - end).join("")}</del><ins aria-label="拟提交内容">{right.slice(start, right.length - end).join("")}</ins>{end ? left.slice(-end).join("") : ""}</p>;
+}
+
+export function ReviewBulletContent({id, from, navigate, children, beforeOnly = false, opening = false}: {
+  id: string; from: number; navigate: Navigate; children: ReactNode; beforeOnly?: boolean; opening?: boolean;
 }) {
-  const review = useBulletReview();
-  if (!review?.review.draft) return <>{children}</>;
-  const {draft, comments} = review.review;
-  const change = review.changes.get(id);
+  const context = useBulletReview();
+  if (!context?.review.draft) return <>{children}</>;
+  const {draft} = context.review;
+  const change = context.changes.get(id);
   const before = draft.base[id], after = draft.proposed[id];
   if (!before && !after) return <>{children}</>;
-  const commentCount = comments.filter(comment => comment.bullet_ids.includes(id)).length;
-  const selected = review.selected.includes(id);
-  const title = bulletTitle((after || before).body);
-  const toggle = () => review.setSelected(selected ? review.selected.filter(value => value !== id) : [...review.selected, id]);
-  const variant = (side: "before" | "after", body: string) => <div className={"bullet-diff-line bullet-diff-line--" + side}>
-    <span className="bullet-diff-sign" aria-label={side === "before" ? "删除的原文" : "拟提交内容"}>{side === "before" ? "−" : "+"}</span>
-    <BulletBody {...{body, from, navigate}}/>
-  </div>;
-  return <div className="review-bullet" data-review-change={beforeOnly ? "moved-from" : change?.kind} data-comment-selected={selected || undefined}>
-    {selectable && <div className="review-bullet-actions">
-      <input type="checkbox" className="review-bullet-select" checked={selected} onChange={toggle} aria-label={"选择批注内容：" + title}/>
-      <IconButton label={"批注：" + title} onClick={() => {review.setSelected([id]); review.setCommentsOpen(true);}}><MessageSquarePlus/></IconButton>
-      {!!commentCount && <button className="review-comment-count" onClick={() => {review.setSelected([]); review.setCommentsOpen(true);}} aria-label={title + "有 " + commentCount + " 条待处理批注"}>{commentCount}</button>}
-    </div>}
-    {beforeOnly ? <><span className="bullet-diff-caption">↪ 原位置</span>{variant("before", before.body)}</>
-      : change?.bodyChanged ? <>{before && variant("before", before.body)}{after && variant("after", after.body)}</>
+  const variant = (side: "before" | "after", body: string) => {
+    const {heading, content} = splitBulletContent(body);
+    return <div className={"bullet-diff-line bullet-diff-line--" + side}>
+      <span className="bullet-diff-sign" aria-label={side === "before" ? "删除的原文" : "拟提交内容"}>{side === "before" ? "−" : "+"}</span>
+      {heading ? <>{opening ? <h1 className="note-title"><InlineTitle text={heading} {...{from, navigate}}/></h1> : <div className="page-block-heading"><BulletBody body={heading} {...{from, navigate}}/></div>}<BulletBody body={content} {...{from, navigate}}/></> : <BulletBody {...{body, from, navigate}}/>}
+    </div>;
+  };
+  const inline = !opening && before && after && !/[\n`*_#~\[\]<>\\]/.test(before.body + after.body);
+  const removedTags = before?.tags.filter(tag => !after?.tags.includes(tag)) || [];
+  const addedTags = after?.tags.filter(tag => !before?.tags.includes(tag)) || [];
+  const removedReferences = before?.references.filter(target => !after?.references.includes(target)) || [];
+  const addedReferences = after?.references.filter(target => !before?.references.includes(target)) || [];
+  const destination = beforeOnly ? draft.proposed[id] : draft.base[id];
+  const position = beforeOnly ? positionLabel(draft.proposed, id) : positionLabel(draft.base, id);
+  return <div className="review-bullet" data-review-change={beforeOnly ? "moved-from" : change?.kind}>
+    {beforeOnly ? <div className="bullet-diff-origin"><BulletBody body={before.body} {...{from, navigate}}/></div>
+      : change?.bodyChanged ? inline ? <InlineBodyDiff before={before.body} after={after.body}/> : <>{before && variant("before", before.body)}{after && variant("after", after.body)}</>
       : children}
-    {!beforeOnly && change?.moved && <div className="bullet-diff-metadata"><span className="bullet-diff-before">− {positionLabel(draft.base, id)}</span><span className="bullet-diff-after">+ {positionLabel(draft.proposed, id)}</span></div>}
-    {!beforeOnly && change?.tagsChanged && <div className="bullet-diff-metadata" aria-label="直接标签变更"><span className="bullet-diff-before">− 标签：{before?.tags.map(tag => "#" + tag).join("、") || "无"}</span><span className="bullet-diff-after">+ 标签：{after?.tags.map(tag => "#" + tag).join("、") || "无"}</span></div>}
-    {!beforeOnly && change?.referencesChanged && <div className="bullet-diff-metadata" aria-label="引用变更">{(["before", "after"] as const).map(side => {
-      const targets = (side === "before" ? before : after)?.references || [];
-      return <span key={side} className={"bullet-diff-" + side}>{side === "before" ? "−" : "+"} 引用：{targets.length ? targets.map(target => <button key={target} onClick={() => navigate({kind: "bullet", id: target}, from)}>{bulletTitle((draft.proposed[target] || draft.base[target]).body)}</button>) : "无"}</span>;
-    })}</div>}
+    {(beforeOnly || change?.moved) && destination && <span className="bullet-diff-position" data-with-body-change={!beforeOnly && change?.bodyChanged && !inline || undefined} aria-label={(beforeOnly ? "移至：" : "原位置：") + position} title={(beforeOnly ? "移至：" : "原位置：") + position}>{beforeOnly ? <ArrowRight/> : <ArrowLeft/>}</span>}
+    {!beforeOnly && !!(removedTags.length + addedTags.length + removedReferences.length + addedReferences.length) && <div className="bullet-diff-metadata">
+      {removedTags.map(tag => <del key={"before:" + tag} aria-label={"移除标签：" + tag}>#{tag}</del>)}
+      {addedTags.map(tag => <ins key={"after:" + tag} aria-label={"添加标签：" + tag}>#{tag}</ins>)}
+      {([removedReferences, addedReferences] as const).map((targets, index) => targets.map(target => {
+        const title = bulletTitle((draft.proposed[target] || draft.base[target])?.body || target);
+        const Tag = index ? "ins" : "del";
+        return <Tag key={index + ":" + target}><button title={(index ? "添加引用：" : "移除引用：") + title} onClick={() => navigate({kind: "bullet", id: target}, from)}><Link2 aria-hidden="true"/>{title}</button></Tag>;
+      }))}
+    </div>}
   </div>;
 }
 
-export function BulletReviewBar({navigate}: {navigate: Navigate}) {
+export function ReviewChangesMenu({navigate}: {navigate: Navigate}) {
   const context = useBulletReview();
-  if (!context) return null;
-  const {review, error, selected, setSelected, setCommentsOpen, refresh} = context;
-  if (!review.draft && !error) return null;
-  return <div className="bullet-review-bar" role="region" aria-label="变更预览">
-    {review.draft && <><strong>待提交变更</strong><span className="bullet-review-legend"><span>− 原内容</span><span>+ 拟提交</span><span>↪ 移动</span></span>
-      <details className="bullet-review-changes"><summary>定位变更</summary><div>{[...context.changes.values()].map(change => <button key={change.id} onClick={() => navigate({kind: "bullet", id: change.id})}><span>{change.kind === "added" ? "+" : change.kind === "deleted" ? "−" : change.moved ? "↪" : "±"}</span>{bulletTitle((change.after || change.before)!.body)}</button>)}{!context.changes.size && <span>尚无内容变更</span>}</div></details>
-      <button className="review-open-comments" onClick={() => setCommentsOpen(true)}><MessageSquare/>{selected.length ? "批注所选内容（" + selected.length + "）" : "批注"}</button>
-      {!!selected.length && <IconButton label="取消选择" onClick={() => setSelected([])}><X/></IconButton>}
-    </>}
-    {error && <span className="bullet-review-error" role="status">{error}</span>}
-    <IconButton label="刷新预览与批注" onClick={() => void refresh()}><RefreshCw/></IconButton>
-    <BulletCommentsDialog key={review.draft?.id || "none"} {...{navigate}}/>
-  </div>;
+  if (!context?.review.draft) return null;
+  return <details className="review-changes-menu"><summary>待提交变更<ChevronDown/></summary><div>{[...context.changes.values()].map(change => <button key={change.id} onClick={() => navigate({kind: "bullet", id: change.id})}><ReviewChangeMark id={change.id}/><span>{bulletTitle((change.after || change.before)!.body)}</span></button>)}</div></details>;
 }
 
-function BulletCommentsDialog({navigate}: {navigate: Navigate}) {
+export function BulletAnnotationControl({navigate, compact = false}: {navigate: Navigate; compact?: boolean}) {
+  const context = useBulletReview();
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!context?.annotationMode) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || context.savingComment) return;
+      event.preventDefault();
+      if (context.commentsOpen) context.setCommentsOpen(false);
+      else {context.setAnnotationMode(false); context.setSelected([]); button.current?.focus();}
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [context]);
+  if (!context || (!context.review.draft && !context.error)) return null;
+  return <>
+    <button ref={button} type="button" className="icon-button bullet-annotation-control" disabled={context.savingComment} aria-label={context.annotationMode ? "退出批注模式" : "批注"} title={context.error || (context.annotationMode ? "退出批注模式 · Esc" : "批注")} aria-pressed={context.annotationMode} data-pending={!!context.review.comments.length || undefined} data-error={!!context.error || undefined} onClick={() => {
+      if (!context.review.draft) {void context.refresh(); return;}
+      const active = !context.annotationMode;
+      context.setAnnotationMode(active); context.setFocusComment(false); context.setAnchor(button.current);
+      context.setSelected([]); context.setCommentsOpen(active && !!context.review.comments.length);
+    }}><MessageSquare/></button>
+    <BulletCommentPopover key={context.review.draft?.id || "none"} {...{navigate, compact}}/>
+  </>;
+}
+
+function BulletCommentPopover({navigate, compact}: {navigate: Navigate; compact: boolean}) {
   const context = useBulletReview()!;
-  const {review, selected, setSelected, commentsOpen, setCommentsOpen, saveComment} = context;
+  const {review, selected, setSelected, commentsOpen, setCommentsOpen, anchor, focusComment, savingComment: saving, saveComment} = context;
   const [body, setBody] = useState("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const requestId = useRef<string | null>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const virtualAnchor = useMemo(() => anchor ? {getBoundingClientRect: () => anchor.getBoundingClientRect(), contextElement: anchor} : null, [anchor]);
+  useEffect(() => {requestId.current = null;}, [selected]);
+  useEffect(() => {if (commentsOpen && focusComment) textarea.current?.focus();}, [commentsOpen, focusComment, selected]);
+  useEffect(() => {if (commentsOpen && anchor && !anchor.isConnected) setCommentsOpen(false);}, [review.draft, anchor, commentsOpen, setCommentsOpen]);
   const draft = review.draft;
-  const validSelected = selected.filter(id => draft && (draft.base[id] || draft.proposed[id]));
   if (!draft) return null;
-  const title = (id: string) => bulletTitle((draft.proposed[id] || draft.base[id])?.body || "已从草稿移除的内容 #" + id);
+  const validSelected = selected.filter(id => draft.base[id] || draft.proposed[id]);
+  const pending = review.comments.filter(comment => !validSelected.length || comment.bullet_ids.some(id => validSelected.includes(id)));
+  const title = (id: string) => bulletTitle((draft.proposed[id] || draft.base[id])?.body || "已移除的内容");
   const save = async () => {
     if (saving || !validSelected.length || !body.trim()) return;
-    setSaving(true); setError("");
-    requestId.current ||= crypto.randomUUID();
+    setError("");
     try {
+      requestId.current ||= createReviewCommentId();
       await saveComment({id: requestId.current, draft_id: draft.id, bullet_ids: validSelected, body});
-      setBody(""); requestId.current = null;
+      setBody(""); requestId.current = null; setCommentsOpen(false); anchor?.focus({preventScroll: true});
     } catch (reason) {setError(reason instanceof Error ? reason.message : "暂时无法保存，请重试。");}
-    finally {setSaving(false);}
   };
-  return <Dialog open={commentsOpen} onOpenChange={open => {if (!saving) setCommentsOpen(open);}}><DialogContent className="bullet-comments-dialog">
-    <DialogTitle>批注</DialogTitle><DialogDescription>保存后，在对话中告诉 agent 处理批注。</DialogDescription>
-    {!!validSelected.length && <form className="bullet-comment-form" onSubmit={event => {event.preventDefault(); void save();}}>
-      <div className="bullet-comment-targets" aria-label="本次批注的内容">{validSelected.map(id => <span key={id}>{title(id)}<IconButton label={"取消选择：" + title(id)} disabled={saving} onClick={() => {setSelected(selected.filter(value => value !== id)); requestId.current = null;}}><X/></IconButton></span>)}</div>
-      <label htmlFor="bullet-comment-body">你的意见</label><textarea id="bullet-comment-body" autoFocus value={body} maxLength={4000} disabled={saving} onChange={event => {setBody(event.target.value); requestId.current = null;}}/>
-      {error && <p role="alert">{error}</p>}<button className="bullet-comment-submit" type="submit" disabled={saving || !body.trim()}>{saving ? "正在保存…" : "保存批注"}</button>
-    </form>}
-    <div className="bullet-pending-comments">{review.comments.map(comment => <article key={comment.id} className="bullet-comment">
-      <div className="bullet-comment-targets">{comment.bullet_ids.map(id => <button key={id} onClick={() => {navigate({kind: "bullet", id}); setCommentsOpen(false);}}>{title(id)}</button>)}</div>
-      <p>{comment.body}</p>
-    </article>)}{!review.comments.length && <p className="bullet-comments-empty">暂无待处理批注。可在正文旁选择一条或多条内容后添加。</p>}</div>
-  </DialogContent></Dialog>;
+  return <Popover open={commentsOpen && !!anchor} onOpenChange={open => {if (!saving) setCommentsOpen(open);}}>
+    <PopoverAnchor virtualRef={{current: virtualAnchor}}/>
+    <PopoverContent className="bullet-comment-popover" aria-label="批注" side={validSelected.length && !compact ? "right" : "bottom"} align={compact ? "end" : "start"} sideOffset={12} collisionPadding={16} collisionBoundary={anchor?.ownerDocument.documentElement}
+      onOpenAutoFocus={event => {event.preventDefault(); if (focusComment) textarea.current?.focus();}}
+      onCloseAutoFocus={event => event.preventDefault()}
+      onEscapeKeyDown={event => {event.preventDefault(); event.stopPropagation(); if (!saving) {setCommentsOpen(false); anchor?.focus({preventScroll: true});}}}
+      onInteractOutside={event => {if (saving || event.target instanceof Element && event.target.closest("[data-annotation-target], .bullet-annotation-control")) event.preventDefault();}}>
+      <div className="bullet-comment-heading"><MessageSquare aria-hidden="true"/><span>{validSelected.length > 1 ? validSelected.length + " 处内容" : validSelected.length ? title(validSelected[0]) : "批注"}</span><IconButton label="关闭批注" disabled={saving} onClick={() => setCommentsOpen(false)}><X/></IconButton></div>
+      {validSelected.length > 1 && <div className="bullet-comment-targets" aria-label="本次批注的内容">{validSelected.map(id => <div key={id}><span>{title(id)}</span><IconButton label={"取消选择：" + title(id)} disabled={saving} onClick={() => setSelected(selected.filter(value => value !== id))}><X/></IconButton></div>)}</div>}
+      {!!pending.length && <div className="bullet-pending-comments">{pending.map(comment => <article key={comment.id} className="bullet-comment">
+        {(!validSelected.length || comment.bullet_ids.length > 1) && <div className="bullet-comment-links">{comment.bullet_ids.map(id => <button key={id} onClick={() => {navigate({kind: "bullet", id}); setCommentsOpen(false);}}>{title(id)}</button>)}</div>}
+        <p>{comment.body}</p>
+      </article>)}</div>}
+      {!!validSelected.length && <form className="bullet-comment-form" onSubmit={event => {event.preventDefault(); void save();}}>
+        <textarea ref={textarea} aria-label="批注内容" placeholder="添加批注…" value={body} maxLength={4000} disabled={saving} onChange={event => {setBody(event.target.value); requestId.current = null;}} onKeyDown={event => {if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {event.preventDefault(); void save();}}}/>
+        <div className="bullet-comment-footer">{error && <p role="alert">{error}</p>}<button className="bullet-comment-submit" type="submit" aria-label={saving ? "正在保存批注" : "保存批注"} title="保存批注 · ⌘ / Ctrl Enter" disabled={saving || !body.trim()}>{saving ? <LoaderCircle className="review-saving"/> : <ArrowUp/>}</button></div>
+      </form>}
+      {context.error && <div className="bullet-comment-error" role="status"><span>{context.error}</span><IconButton label="刷新预览与批注" onClick={() => void context.refresh()}><RefreshCw/></IconButton></div>}
+    </PopoverContent>
+  </Popover>;
 }

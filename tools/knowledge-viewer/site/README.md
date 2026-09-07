@@ -24,7 +24,7 @@ PostgreSQL bigint 在查询时转为 text。每张表持续分页至空页；刷
 
 agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建和修改 Supabase 草稿。网站在完整知识浏览界面中，以红色与减号保留原文、绿色与加号显示拟提交内容；移动保留原位置和新位置，直接标签与引用也参与 diff。草稿每次修改始终与首次正式快照比较，只有一个当前值。
 
-正文旁可选择一个或多个 bullet 保存批注。批注经登录与同源校验后写入 D1 的 bullet_review_comment；agent 通过 Sites 数据库工具读取，并根据用户在对话中的要求处理。agent 将完成的批注 ID 与新草稿一同保存，网站再删除对应 D1 行。页面可见时每 8 秒刷新，失败保留已显示内容与尚未保存的输入。正式提交在用户于对话中确认后由 agent 执行。
+右上角的批注图标开启直接选择；单击正文写批注，Ctrl / Command 点击增减选择。批注在邻近浮层保存，已有意见通过正文旁的小图标查看。Esc 关闭浮层，再次按下退出批注模式；Ctrl / Command + Enter 保存。批注经登录与同源校验后写入 D1 的 bullet_review_comment；agent 通过 Sites 数据库工具读取，并根据用户在对话中的要求处理。agent 将完成的批注 ID 与新草稿一同保存，网站再删除对应 D1 行。页面可见时每 8 秒刷新，失败保留已显示内容与尚未保存的输入。正式提交在用户于对话中确认后由 agent 执行。
 
 部署前需在 Supabase 安装一次预览模块的 schema.sql，并保留原正式表只读策略。草稿另用服务端 secret SUPABASE_DRAFT_READ_KEY：schema 中配置其 SHA-256 摘要，RLS 必须验证对应请求头才允许读取，凭据错误会报权限错误。原始凭据不进 Git 或浏览器；具体安装方法见预览子 skill。网站发布时会根据 .openai/hosting.json 创建 DB binding，并应用 drizzle/0000_bullet_review_comment.sql。日常修改草稿和处理批注不需要再部署。
 

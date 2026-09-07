@@ -69,13 +69,13 @@ test('引用和直接标签按集合比较，bigint 与 FSRS 数据保持完整'
   assert.throws(()=>parseBulletDraft({...value,proposed:{'1':{...row('损坏'),sibling_order:9007199254740993}}}),/invalid/);
 });
 
-test('真实组件渲染原文和最新草稿、多选入口及原位置，保留 Markdown',()=>{
+test('真实组件渲染原文和最新草稿、直接选择及原位置，保留 Markdown',()=>{
   const value=draft({'1':row('父'),'2':row('a 原文','1',1)});value.proposed['2'].body='b **最新草稿**';
-  const context={review:{draft:value,comments:[]},changes:bulletChanges(value),selected:['1','2'],setSelected(){},setCommentsOpen(){}};
+  const context={review:{draft:value,comments:[]},changes:bulletChanges(value),selected:['1','2'],annotationMode:true,setSelected(){},setCommentsOpen(){}};
   const model=buildKnowledgeModel(previewSnapshot(empty,value));
   const html=renderToStaticMarkup(React.createElement(BulletReviewContext.Provider,{value:context},React.createElement(ReadingViewProvider,{viewKey:'test',cache:new Map()},React.createElement(PageBulletList,{parentId:'1',model,from:0,navigate(){}}))));
   assert.match(html,/a 原文/);assert.match(html,/b <strong>最新草稿<\/strong>/);assert.doesNotMatch(html,/c 中间版本/);
-  assert.match(html,/type="checkbox"[^>]*checked/);assert.match(html,/删除的原文/);assert.match(html,/拟提交内容/);
+  assert.doesNotMatch(html,/type="checkbox"/);assert.match(html,/data-annotation-target="2"[^>]*data-comment-selected="true"/);assert.match(html,/删除的原文/);assert.match(html,/拟提交内容/);
   const unchanged=renderToStaticMarkup(React.createElement(ReviewBulletContent,{id:'2',from:0,navigate(){}},'原阅读内容'));
   assert.equal(unchanged,'原阅读内容');
 });

@@ -24,7 +24,7 @@ import { readingFontSettings, readingSpineOffset, scrollReadingTarget } from "@/
 import { useReadingFont } from "@/components/reader-presentation/use-reading-font";
 import type { Bullet, Fsrs, Panel, Review, Snapshot } from "@/lib/knowledge-types";
 import { BulletReviewProvider, useBulletReview } from "@/components/bullet-review-context";
-import { BulletReviewBar, ReviewBulletContent, ReviewChangeMark } from "@/components/reader-presentation/bullet-review";
+import { BulletAnnotationControl, BulletCommentPin, ReviewBulletContent, ReviewChangeMark, ReviewChangesMenu, useBulletAnnotation } from "@/components/reader-presentation/bullet-review";
 import { previewSnapshot } from "@/lib/bullet-review";
 
 type Model = ReturnType<typeof buildKnowledgeModel>;
@@ -147,7 +147,9 @@ function ReadingHeader({panels, active, model, activate, navigate, search, font,
           <div className="font-control"><span>Aa</span><output aria-label="当前字号">{size ?? font?.defaultSize}</output><IconButton label="缩小字号" disabled={!font || size === null || size <= font.min} onClick={() => size !== null && changeSize(size - 1)}><Minus/></IconButton><IconButton label="恢复默认字号" disabled={!font || size === font.defaultSize} onClick={() => font && changeSize(font.defaultSize)}><RotateCcw/></IconButton><IconButton label="放大字号" disabled={!font || size === null || size >= font.max} onClick={() => size !== null && changeSize(size + 1)}><Plus/></IconButton></div>
           <div className="preference-actions"><IconButton label={copied ? "已复制阅读路径" : "复制到当前篇的阅读路径"} onClick={copy}>{copied ? <Check/> : <Copy/>}</IconButton>{!focused && <IconButton label="专注阅读当前篇" onClick={() => setFocused(true)}><Maximize2/></IconButton>}<IconButton label="刷新知识库" onClick={refresh} disabled={refreshing}><RefreshCw/></IconButton><IconButton label="阅读帮助与快捷键" onClick={help}><CircleHelp/></IconButton></div>
           <small className="connection-status" role="status">{error ? "连接暂不可用" : refreshing ? "正在读取…" : fetchedAt ? "更新于 " + dateText(fetchedAt, true) : "尚未连接"}</small>
+          <ReviewChangesMenu navigate={navigate}/>
         </PopoverContent></Popover>
+        <BulletAnnotationControl navigate={navigate} compact={isMobile}/>
       </div>
     </div>
     {panels.length > 1 && <nav className="reading-path-navigation" aria-label="已打开的阅读路径">
@@ -185,6 +187,8 @@ function NoteOutline({id, model, jump}: {id: string; model: Model; jump: (id: st
 }
 
 function BulletPage({panel, model, from, navigate, restorePosition = false}: {panel: Extract<Panel, {kind: "bullet"}>; model: Model; from: number; navigate: Navigate; restorePosition?: boolean}) {
+  const annotation = useBulletAnnotation(panel.id);
+  const bulletReview = useBulletReview();
   const {id} = panel;
   const bullet: Bullet | undefined = model.bulletsById.get(id);
   const {view, updateView, scrollRef} = useReadingView();
@@ -235,7 +239,7 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
   if (!bullet) return <EmptyState title="这条笔记已不在知识库中">可以从目录重新定位，或刷新知识库。</EmptyState>;
   const children: Bullet[] = model.getChildren(id);
   const subtree: Bullet[] = model.getSubtree(id);
-  const tags: string[] = model.tagsById.get(id) || [];
+  const tags: string[] = (model.tagsById.get(id) || []).filter((tag: string) => !bulletReview?.changes.get(id)?.tagsChanged || !bulletReview.review.draft?.proposed[id]?.tags.includes(tag));
   const path: {id: string | null; label: string}[] = model.getPath(id).slice(1, -1);
   const {heading, content} = splitBulletContent(bullet.body);
   const siblings: Bullet[] = model.getChildren(bullet.parent_id);
@@ -248,11 +252,12 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
     </div>
     {focusError && <p role="status" className="location-message">{focusError}</p>}
     {view.highlight && <div className="search-match-bar" role="region" aria-label="搜索命中"><span title={view.highlight}>“{view.highlight}”</span><small role="status">{matchCount ? Math.min(view.matchIndex + 1, matchCount) + " / " + matchCount : "当前展开内容无匹配"}</small><IconButton label="上一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex - 1)}><ArrowLeft/></IconButton><IconButton label="下一个命中" disabled={!matchCount} onClick={() => moveToMatch(view.matchIndex + 1)}><ArrowRight/></IconButton><IconButton label="清除搜索高亮" onClick={() => updateView({highlight: "", matchIndex: 0})}><X/></IconButton></div>}
-    <div data-bullet-id={id} className="note-opening" data-located={view.focusedId === id}>
-      <ReviewBulletContent {...{id, from, navigate}}>
+    <div data-bullet-id={id} className="note-opening" data-located={view.focusedId === id} {...annotation}>
+      <ReviewBulletContent {...{id, from, navigate}} opening>
       {heading ? <h1 className="note-title"><InlineTitle text={heading} query={view.highlight} {...{from, navigate}}/></h1> : <h1 className="sr-only">{bulletTitle(bullet.body, 140)}</h1>}
       <BulletBody body={content} {...{from, navigate}} query={view.highlight}/>
       </ReviewBulletContent>
+      <BulletCommentPin id={id}/>
     </div>
     {!!tags.length && <div className="note-tags" aria-label="有效标签，包含从祖先继承的标签">{tags.map(tag => <button key={tag} title="包含直接与继承标签" onClick={() => navigate({kind: "tag", tag}, from)}>#{tag}</button>)}</div>}
     {!!children.length && <section className="child-notes">
@@ -411,7 +416,7 @@ function SearchDialog({open, setOpen, model, navigate, active}: {open: boolean; 
 }
 
 function HelpDialog({open, setOpen}: {open: boolean; setOpen: (open: boolean) => void}) {
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>浏览不会修改正式知识或记录复习。待提交变更可在正文旁选择一条或多条内容并批注，再回到对话中让 agent 处理。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。圆点在后文独立打开内容块，旁边的三角只展开或收起下级；圆点外的淡色圆环表示下级已折叠。引用与反向引用保留来源路径和完整原文，点击路径可回到上下文。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="help-dialog"><DialogTitle>阅读与导航</DialogTitle><DialogDescription>浏览不会修改正式知识或记录复习。右上角开启批注后，点击正文选择内容；按住 Ctrl 或 ⌘ 可增减选择。保存后回到对话中让 agent 处理。</DialogDescription><div className="help-content"><p>蓝色链接在后面打开一页，前文保留。来源链接会有蓝色标记；点击左侧书脊可以返回；窄屏或专注时使用上方路径与方向键。</p><p>点击笔记上方或搜索结果中的父级路径，可在上下文中定位原文。圆点在后文独立打开内容块，旁边的三角只展开或收起下级；圆点外的淡色圆环表示下级已折叠。引用与反向引用保留来源路径和完整原文，点击路径可回到上下文。目录图标跳到下级内容，双箭头统一展开或收起。</p><p>专注阅读只隐藏其他页面，退出后路径不变。浏览器后退会恢复之前的阅读分支、展开状态和位置。</p><dl><div><dt>搜索整个知识库</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>K</kbd></dd></div><div><dt>显示或隐藏目录</dt><dd><kbd>⌘ / Ctrl</kbd> <kbd>B</kbd></dd></div><div><dt>前一篇 / 后一篇</dt><dd><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>← / →</kbd></dd></div><div><dt>退出批注或专注阅读 / 关闭浮层</dt><dd><kbd>Esc</kbd></dd></div><div><dt>打开这份说明</dt><dd><kbd>?</kbd></dd></div></dl><p className="help-footnote">右上角阅读设置可调整字号、复制路径、进入专注阅读和刷新知识库。字号只保存在当前设备。阅读位置与展开状态保留到本次会话结束。复制阅读路径可以重新打开同一组笔记，访问仍受私有权限保护。</p></div></DialogContent></Dialog>;
 }
 
 function ReaderWorkspace() {
@@ -606,12 +611,11 @@ function ReaderWorkspace() {
     } catch {toast.error("无法自动复制", {description: "请复制浏览器地址栏中的地址。"});}
   };
 
-  return <div className="knowledge-app">
+  return <div className="knowledge-app" data-annotation-mode={reviewContext?.annotationMode || undefined}>
     <a className="skip-link" href="#reading-content" onClick={event => {event.preventDefault(); sheetRefs.current.get(active)?.querySelector<HTMLElement>(".sheet-scroll")?.focus();}}>跳到阅读内容</a>
     <ReaderNavigation {...{model, panels, active, navigate}}/>
     <main className="reader-main" id="reading-content">
       <ReadingHeader {...{panels, active, model, activate, navigate, font, changeSize, focused, setFocused, refreshing, error}} search={() => setSearchOpen(true)} size={fontSize} copy={() => void copyLink(active)} copied={copied === active} refresh={() => void refresh()} fetchedAt={snapshot?.fetched_at} help={() => setHelpOpen(true)}/>
-      <BulletReviewBar navigate={navigate}/>
       {error && <div className="error-banner" role="alert"><span>{error}</span><button onClick={() => void refresh()} disabled={refreshing}>重新连接</button></div>}
       <div ref={stackRef} className="reading-stack" data-count={panels.length} data-focus={focused} onScroll={() => {
         if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);

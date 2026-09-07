@@ -11,6 +11,7 @@
 - 文字排版应紧凑、自然，统一设计行间距及段落、列表、标题之间的节奏。保留原文、代码和来源上下文，不以截断或重复摘要替代正文阅读。
 - 删除并避免重新加入“xx 条笔记”“xx 个记忆对象”“x 字符”等冗余统计。搜索匹配数量、当前阅读路径位置等直接帮助完成操作的信息可以保留。
 - bullet 变更以整体 diff 叠加在阅读界面，保留原文与最新草稿。用户可对一个或多个 bullet 留批注，通过对话要求 agent 修改；网站不提供正文编辑或正式提交按钮。草稿和批注不版本化。
+- 批注与 diff 优先维护连续阅读：右上角集中入口，操作热区贴合正文行，选择反馈沿用圆点；正常阅读不出现逐条工具栏。变化使用必要的符号与淡色表达，详细说明留在悬停提示与帮助中。
 
 ## 必须独立维护的架构部分
 
@@ -35,8 +36,8 @@
 | 页内列表、链接、引用的局部尺度、缩进、排版和交互状态 | [page-content/page-content.css](site/components/reader-presentation/page-content/page-content.css) |
 | 按阅读路径保存滚动、折叠、搜索与详情状态：`ReadingViewProvider` | [reading-view.tsx](site/components/reading-view.tsx) |
 | 草稿数据契约、原文与最新草稿比较、包含删除位置的预览快照 | [bullet-review.ts](site/lib/bullet-review.ts) |
-| 草稿与待处理批注的刷新、多选及保存状态 | [bullet-review-context.tsx](site/components/bullet-review-context.tsx) |
-| bullet diff、原位置、变更定位与批注交互及视觉样式 | [bullet-review.tsx](site/components/reader-presentation/bullet-review.tsx)、[bullet-review.css](site/components/reader-presentation/bullet-review.css) |
+| 草稿与待处理批注的刷新、批注模式、多选与保存状态 | [bullet-review-context.tsx](site/components/bullet-review-context.tsx) |
+| bullet diff、原位置、设置内变更定位；直接选择、圆点反馈、非模态批注浮层：`useBulletAnnotation`、`BulletAnnotationControl`、`BulletCommentPopover` | [bullet-review.tsx](site/components/reader-presentation/bullet-review.tsx)、[bullet-review.css](site/components/reader-presentation/bullet-review.css) |
 | 固定读取 Supabase 当前草稿 | [supabase-draft.ts](site/lib/supabase-draft.ts) |
 | D1 批注保存、重试去重与已处理批注清理 | [bullet-review-store.ts](site/lib/bullet-review-store.ts)、[schema.ts](site/db/schema.ts) |
 | 登录校验、预览读取与同源批注写入 | [预览 API](site/app/api/bullet-review/route.ts)、[批注 API](site/app/api/bullet-review/comments/route.ts) |

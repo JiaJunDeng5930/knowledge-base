@@ -6,6 +6,10 @@ import { bulletChanges, parseBulletDraft, type BulletReview, type ReviewComment 
 export type BulletReviewContextValue = {
   review: BulletReview; changes: ReturnType<typeof bulletChanges>; error: string | null;
   selected: string[]; setSelected: (ids: string[]) => void;
+  annotationMode: boolean; setAnnotationMode: (active: boolean) => void;
+  anchor: HTMLElement | null; setAnchor: (anchor: HTMLElement | null) => void;
+  focusComment: boolean; setFocusComment: (focus: boolean) => void;
+  savingComment: boolean;
   commentsOpen: boolean; setCommentsOpen: (open: boolean) => void;
   refresh: () => Promise<void>; saveComment: (comment: Omit<ReviewComment, "created_at">) => Promise<void>;
 };
@@ -16,6 +20,10 @@ export function BulletReviewProvider({children}: {children: ReactNode}) {
   const [review, setReview] = useState<BulletReview>({draft: null, comments: []});
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [annotationMode, setAnnotationMode] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [focusComment, setFocusComment] = useState(false);
+  const [savingComment, setSavingComment] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const inFlight = useRef<Promise<void> | null>(null);
   const sequence = useRef(0);
@@ -52,15 +60,18 @@ export function BulletReviewProvider({children}: {children: ReactNode}) {
     document.addEventListener("visibilitychange", visibleRefresh);
     return () => {window.clearInterval(interval); window.removeEventListener("focus", visibleRefresh); document.removeEventListener("visibilitychange", visibleRefresh); sequence.current++;};
   }, [refresh]);
-  useEffect(() => {setSelected([]); setCommentsOpen(false);}, [review.draft?.id]);
+  useEffect(() => {setSelected([]); setCommentsOpen(false); setAnnotationMode(false); setAnchor(null);}, [review.draft?.id]);
   const saveComment = useCallback(async (comment: Omit<ReviewComment, "created_at">) => {
-    const response = await fetch("/api/bullet-review/comments", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(comment), signal: AbortSignal.timeout(30000)});
-    const next = await response.json() as BulletReview & {error?: string};
-    if (!response.ok) throw new Error(next.error || "批注保存失败，请重试。");
-    sequence.current++;
-    apply(next);
-    setSelected([]);
+    setSavingComment(true);
+    try {
+      const response = await fetch("/api/bullet-review/comments", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(comment), signal: AbortSignal.timeout(30000)});
+      const next = await response.json() as BulletReview & {error?: string};
+      if (!response.ok) throw new Error(next.error || "批注保存失败，请重试。");
+      sequence.current++;
+      apply(next);
+      setSelected([]);
+    } finally {setSavingComment(false);}
   }, [apply]);
   const changes = useMemo(() => review.draft ? bulletChanges(review.draft) : new Map(), [review.draft]);
-  return <BulletReviewContext.Provider value={{review, changes, error, selected, setSelected, commentsOpen, setCommentsOpen, refresh, saveComment}}>{children}</BulletReviewContext.Provider>;
+  return <BulletReviewContext.Provider value={{review, changes, error, selected, setSelected, annotationMode, setAnnotationMode, anchor, setAnchor, focusComment, setFocusComment, savingComment, commentsOpen, setCommentsOpen, refresh, saveComment}}>{children}</BulletReviewContext.Provider>;
 }
