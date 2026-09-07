@@ -239,7 +239,7 @@ function BulletPage({panel, model, from, navigate, restorePosition = false}: {pa
   if (!bullet) return <EmptyState title="这条笔记已不在知识库中">可以从目录重新定位，或刷新知识库。</EmptyState>;
   const children: Bullet[] = model.getChildren(id);
   const subtree: Bullet[] = model.getSubtree(id);
-  const tags: string[] = (model.tagsById.get(id) || []).filter((tag: string) => !bulletReview?.changes.get(id)?.tagsChanged || !bulletReview.review.draft?.proposed[id]?.tags.includes(tag));
+  const tags: string[] = (model.tagsById.get(id) || []).filter((tag: string) => !bulletReview?.changes.get(id)?.tagsChanged || !bulletReview.review.draft?.proposed[id]?.tags.includes(tag) || !!bulletReview.review.draft?.base[id]?.tags.includes(tag));
   const path: {id: string | null; label: string}[] = model.getPath(id).slice(1, -1);
   const {heading, content} = splitBulletContent(bullet.body);
   const siblings: Bullet[] = model.getChildren(bullet.parent_id);
