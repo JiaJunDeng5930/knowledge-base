@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TypedDict
 
-from typing import Self
+from typing_extensions import Self
 
 from fsrs.state import State
 

@@ -90,7 +90,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-py-fsrs 本身已保存在 `third_party/py-fsrs/`，脚本直接加载该副本。`requirements.txt` 固定优化器使用的第三方依赖；基础状态计算需要 Python 3.11 或更新版本，只使用标准库和随附源码。
+py-fsrs 本身已保存在 `third_party/py-fsrs/`，脚本直接加载该副本。`requirements.txt` 固定优化器使用的第三方依赖；基础状态计算只使用 Python 标准库和随附源码。
 
 调用格式为：
 
