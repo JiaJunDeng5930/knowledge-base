@@ -1,0 +1,75 @@
+/* 阅读动画：短时淡入、快速起步后减速；公共参数由 reader.css 统一声明。 */
+.icon-button, .nav-item, .navigation-row, .tree-disclosure, .page-block-toggle,
+.page-link, .knowledge-link, .page-block-row, .path-picker, summary {
+  transition: color var(--reader-motion-fast) linear, background-color var(--reader-motion-fast) linear;
+}
+.tree-disclosure > svg, .page-block-toggle > svg, .page-reference-caret {
+  transition: transform var(--reader-motion-expand) var(--reader-motion-ease);
+}
+.tree-disclosure[aria-expanded="true"] > svg, .page-block-toggle[aria-expanded="true"] > svg { transform: rotate(90deg); }
+.page-block-dot { transition: box-shadow var(--reader-motion-fast) linear; }
+
+.sheet-spine {
+  transition: opacity var(--reader-motion-fade) linear, visibility 0s var(--reader-motion-fade),
+    color var(--reader-motion-fast) linear, background-color var(--reader-motion-fast) linear;
+}
+.reading-sheet[data-stacked="true"] .sheet-spine { transition-delay: 0s; }
+.reading-sheet > .sheet-scroll { animation: reading-fade-in var(--reader-motion-fade) linear; }
+.reading-sheet > .sheet-scroll > .sheet-content {
+  animation: reading-page-enter var(--reader-motion-expand) var(--reader-motion-ease);
+}
+
+/* Radix 保留正在退出的内容，动画结束后卸载；关闭期间由调用处禁用焦点和交互。 */
+.reading-collapse { overflow: clip; }
+.reading-collapse[data-state="open"] { animation: reading-expand var(--reader-motion-expand) var(--reader-motion-ease); }
+.reading-collapse[data-state="closed"] { animation: reading-collapse var(--reader-motion-expand) var(--reader-motion-ease); }
+@keyframes reading-expand {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+@keyframes reading-collapse {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+[data-slot="sidebar-gap"], [data-slot="sidebar-container"] {
+  transition-duration: var(--reader-motion-expand);
+  transition-timing-function: var(--reader-motion-ease);
+}
+[data-slot="sheet-content"] { animation-duration: var(--reader-motion-expand); animation-timing-function: var(--reader-motion-ease); }
+:is([data-slot="popover-content"], [data-slot="tooltip-content"], [data-slot="dialog-content"])[data-state="open"],
+[data-slot="tooltip-content"][data-state="delayed-open"], [data-slot="tooltip-content"][data-state="instant-open"] {
+  animation: reading-popover-in var(--reader-motion-fade) var(--reader-motion-ease);
+}
+:is([data-slot="popover-content"], [data-slot="tooltip-content"], [data-slot="dialog-content"])[data-state="closed"] {
+  animation: reading-popover-out var(--reader-motion-fast) linear;
+}
+:is([data-slot="dialog-overlay"], [data-slot="sheet-overlay"])[data-state="open"] { animation: reading-fade-in var(--reader-motion-fade) linear; }
+:is([data-slot="dialog-overlay"], [data-slot="sheet-overlay"])[data-state="closed"] { animation: reading-fade-out var(--reader-motion-fast) linear; }
+@keyframes reading-page-enter { from { transform: translateX(var(--reader-motion-enter-distance)); } to { transform: translateX(0); } }
+@keyframes reading-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes reading-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes reading-popover-in { from { opacity: 0; transform: translateY(var(--reader-motion-popover-distance)); } to { opacity: 1; transform: translateY(0); } }
+@keyframes reading-popover-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* 支持原生 details 高度插值的浏览器平滑展开引用和详情，其余浏览器保留原生行为。 */
+@supports (interpolate-size: allow-keywords) and selector(details::details-content) {
+  .sheet-content details { interpolate-size: allow-keywords; }
+  .sheet-content details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size var(--reader-motion-expand) var(--reader-motion-ease),
+      content-visibility var(--reader-motion-expand) allow-discrete;
+  }
+  .sheet-content details[open]::details-content { block-size: auto; }
+}
+
+@media (prefers-reduced-motion: reduce), print {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

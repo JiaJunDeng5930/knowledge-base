@@ -21,14 +21,15 @@
 
 当用户要求把某个功能、概念或呈现方式作为源码中的专门部分实现时，必须在同一次修改中主动补充或更新本文件的索引，写明该部分的职责和实际源码入口，无须用户再次提醒。后续移动、重命名、重构或职责变化时，同步维护对应索引。
 
-批注和 diff 必须分别由独立模块承载，页面只组合组件；[网站 AGENTS.md](site/AGENTS.md) 记录程序实体、依赖关系和各模块负责的规则。
+阅读动画、批注和 diff 必须分别由独立模块承载，页面只组合组件及调用接口；[网站 AGENTS.md](site/AGENTS.md) 记录程序实体、依赖关系和各模块负责的规则。阅读动画的滚动目标、取消、书页位移、展开与退出过渡集中在 `reader-presentation/reading-motion/`，不得散回业务组件。
 
 下表路径均相对于本文件所在目录。
 
 | 需求或职责 | 源码入口 |
 | --- | --- |
 | 阅读呈现的公共主题、字体、字号、行高、颜色、布局及响应式规则 | [reader.css](site/components/reader-presentation/reader.css) |
-| 从 CSS 读取字号设置、书脊尺度与滚动定位参数 | [metrics.ts](site/components/reader-presentation/metrics.ts) |
+| 从 CSS 读取字号设置与书脊尺度 | [metrics.ts](site/components/reader-presentation/metrics.ts) |
+| 独立阅读动画模块：`useReadingStackMotion`、`scrollReadingTarget`、`ReadingCollapse`；统一滚动、书脊、书页过渡、内容展开与动画取消 | [reading-motion/index.ts](site/components/reader-presentation/reading-motion/index.ts)、[reading-motion/reading-motion.css](site/components/reader-presentation/reading-motion/reading-motion.css) |
 | 本设备字号偏好及正文、浮层之间的同步 | [use-reading-font.ts](site/components/reader-presentation/use-reading-font.ts) |
 | 图标动作按钮的统一语义、名称与提示 | [icon-button.tsx](site/components/reader-presentation/icon-button.tsx) |
 | 页内内容块、引用方向及来源分组模型：`PageBlock`、`ReferenceSection`、`ReferenceGroup` | [page-content/model.ts](site/components/reader-presentation/page-content/model.ts) |

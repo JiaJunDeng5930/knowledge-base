@@ -20,8 +20,9 @@ import { PageBulletList } from "@/components/reader-presentation/page-content/bl
 import { PageReferences } from "@/components/reader-presentation/page-content/reference-list";
 import { ROOT_LABELS, type Navigate } from "@/components/reader-presentation/page-content/model";
 import { IconButton } from "@/components/reader-presentation/icon-button";
-import { readingFontSettings, readingSpineOffset, scrollReadingTarget } from "@/components/reader-presentation/metrics";
+import { readingFontSettings } from "@/components/reader-presentation/metrics";
 import { useReadingFont } from "@/components/reader-presentation/use-reading-font";
+import { ReadingCollapse, ReadingCollapseContent, ReadingCollapseTrigger, scrollReadingTarget, useReadingStackMotion } from "@/components/reader-presentation/reading-motion";
 import type { Bullet, Fsrs, Panel, Review, Snapshot } from "@/lib/knowledge-types";
 import { BulletReviewProvider, useBulletReview } from "@/components/bullet-review-context";
 import { BulletAnnotationControl, BulletCommentPin, useBulletAnnotation } from "@/components/reader-presentation/bullet-annotations";
@@ -95,13 +96,13 @@ function NavigationTree({bullet, model, navigate, activeId, depth = 0}: {bullet:
     const frame = requestAnimationFrame(() => rowRef.current?.scrollIntoView({block: "nearest", inline: "nearest", behavior: "instant"}));
     return () => cancelAnimationFrame(frame);
   }, [activeId, bullet.id]);
-  return <li className="navigation-node">
+  return <ReadingCollapse open={expanded} onOpenChange={setExpanded} asChild><li className="navigation-node">
     <div ref={rowRef} className="navigation-row" data-active={activeId === bullet.id} style={{"--tree-depth": depth} as CSSProperties}>
-      {children.length ? <button className="tree-disclosure" onClick={() => setExpanded(!expanded)} aria-label={(expanded ? "折叠 " : "展开 ") + bulletTitle(bullet.body)} aria-expanded={expanded}>{expanded ? <ChevronDown/> : <ChevronRight/>}</button> : <span className="tree-dot" />}
+      {children.length ? <ReadingCollapseTrigger><button className="tree-disclosure" aria-label={(expanded ? "折叠 " : "展开 ") + bulletTitle(bullet.body)} aria-expanded={expanded}><ChevronRight/></button></ReadingCollapseTrigger> : <span className="tree-dot" />}
       <button className="tree-label" aria-current={activeId === bullet.id ? "page" : undefined} onClick={() => navigate({kind: "bullet", id: bullet.id})} title={bulletTitle(bullet.body, 500)}><BulletDiffNavigationLabel id={bullet.id}>{depth === 0 ? rootLabel(bullet) : bulletTitle(bullet.body)}</BulletDiffNavigationLabel></button>
     </div>
-    {expanded && !!children.length && <ul>{children.map(child => <NavigationTree key={child.id} bullet={child} model={model} navigate={navigate} activeId={activeId} depth={depth + 1}/>)}</ul>}
-  </li>;
+    {!!children.length && <ReadingCollapseContent open={expanded}><ul>{children.map(child => <NavigationTree key={child.id} bullet={child} model={model} navigate={navigate} activeId={activeId} depth={depth + 1}/>)}</ul></ReadingCollapseContent>}
+  </li></ReadingCollapse>;
 }
 
 function ReaderNavigation({model, panels, active, navigate}: {model: Model | null; panels: Panel[]; active: number; navigate: Navigate}) {
@@ -435,74 +436,33 @@ function ReaderWorkspace() {
   const [copied, setCopied] = useState<number | null>(null);
   const [focused, setFocusState] = useState(false);
   const [restoringPath, setRestoringPath] = useState(true);
-  const [stacked, setStacked] = useState<number[]>([]);
   const [now, setNow] = useState(0);
   const {open: sidebarOpen, setOpen: setSidebarOpen} = useSidebar();
   const sidebarBeforeFocus = useRef(true);
   const panelsRef = useRef(panels);
   const activeRef = useRef(active);
   const readingViews = useRef(new Map<string, ReadingView>());
-  const scrollFrame = useRef<number | null>(null);
   const requestNumber = useRef(0);
-  const stackRef = useRef<HTMLDivElement>(null);
-  const sheetRefs = useRef(new Map<number, HTMLElement>());
   const model = useMemo(() => snapshot ? buildKnowledgeModel(draft ? previewSnapshot(snapshot, draft) : snapshot) : null, [snapshot, draft]);
   const memoryModel = useMemo(() => snapshot ? buildKnowledgeModel(snapshot) : null, [snapshot]);
   panelsRef.current = panels;
   activeRef.current = active;
-
-  const setFocused = useCallback((value: boolean) => {
-    if (value && !focused) {sidebarBeforeFocus.current = sidebarOpen; setSidebarOpen(false);}
-    if (!value && focused) setSidebarOpen(sidebarBeforeFocus.current);
-    setFocusState(value);
-  }, [focused, sidebarOpen, setSidebarOpen]);
 
   const rememberActive = useCallback((index: number) => {
     activeRef.current = index; setActive(index);
     window.history.replaceState({...window.history.state, knowledgeReader: {active: index}}, "", window.location.href);
   }, []);
 
-  const syncStackGeometry = useCallback(() => {
-    const stack = stackRef.current;
-    if (!stack) return;
-    const bounds = stack.getBoundingClientRect();
-    const sheets = [...sheetRefs.current.entries()].sort((a, b) => a[0] - b[0]);
-    const collapsed: number[] = [];
-    let nextActive = activeRef.current;
-    let greatestVisible = 0;
-    const visibleWidths = new Map<number, number>();
-    for (let i = 0; i < sheets.length; i++) {
-      const [index, sheet] = sheets[i];
-      if (sheet.offsetWidth === 0) continue;
-      const rect = sheet.getBoundingClientRect();
-      const next = sheets[i + 1]?.[1];
-      const nextLeft = next?.offsetWidth ? next.getBoundingClientRect().left : bounds.right;
-      const visible = Math.max(0, Math.min(rect.right, bounds.right, nextLeft) - Math.max(rect.left, bounds.left));
-      visibleWidths.set(index, visible);
-      if (!focused && getComputedStyle(sheet).position === "sticky" && visible <= readingSpineOffset(stack, 1) + 1 && rect.left < bounds.right && rect.right > bounds.left) collapsed.push(index);
-      if (visible > greatestVisible) {greatestVisible = visible; nextActive = index;}
-    }
-    setStacked(current => current.join(",") === collapsed.join(",") ? current : collapsed);
-    // 两页同时可读时保留用户选择，不让滚动事件抢走当前页。
-    const current = sheetRefs.current.get(activeRef.current);
-    if (current && (visibleWidths.get(activeRef.current) || 0) >= Math.min(current.offsetWidth, stack.clientWidth) - 3) return;
-    if (greatestVisible > stack.clientWidth / 2 && nextActive !== activeRef.current) rememberActive(nextActive);
-  }, [focused, rememberActive]);
+  const {stackRef, sheetRefs, stacked, activate, preparePathChange, prepareLayoutChange, onStackScroll} = useReadingStackMotion({
+    path: panels, active, focused, ready: !!model, onActiveChange: rememberActive,
+  });
 
-  const activate = useCallback((index: number) => {
-    if (index < 0 || index >= panelsRef.current.length) return;
-    rememberActive(index);
-    const stack = stackRef.current;
-    const sheet = sheetRefs.current.get(index);
-    if (!stack || !sheet || focused) return;
-    // sticky 面板的 offsetLeft 随滚动变化；使用自然排列位置计算目标。
-    let left = 0;
-    for (let i = 0; i < index; i++) left += sheetRefs.current.get(i)?.offsetWidth || 0;
-    const pinned = readingSpineOffset(stack, index);
-    const right = left + sheet.offsetWidth;
-    if (left < stack.scrollLeft + pinned) stack.scrollTo({left: Math.max(0, left - pinned), behavior: "instant"});
-    else if (right > stack.scrollLeft + stack.clientWidth) stack.scrollTo({left: right - stack.clientWidth, behavior: "instant"});
-  }, [focused, rememberActive]);
+  const setFocused = useCallback((value: boolean) => {
+    prepareLayoutChange();
+    if (value && !focused) {sidebarBeforeFocus.current = sidebarOpen; setSidebarOpen(false);}
+    if (!value && focused) setSidebarOpen(sidebarBeforeFocus.current);
+    setFocusState(value);
+  }, [focused, sidebarOpen, setSidebarOpen, prepareLayoutChange]);
 
   const refresh = useCallback(async () => {
     const requestId = ++requestNumber.current;
@@ -530,6 +490,7 @@ function ReaderWorkspace() {
     const restorePath = () => {
       setRestoringPath(true);
       const restored = readPanels(new URL(window.location.href));
+      preparePathChange(restored.length);
       const savedActive = window.history.state?.knowledgeReader?.active;
       const index = Number.isInteger(savedActive) && savedActive >= 0 && savedActive < restored.length ? savedActive : restored.length - 1;
       panelsRef.current = restored; activeRef.current = index;
@@ -547,16 +508,16 @@ function ReaderWorkspace() {
     return () => {
       window.removeEventListener("popstate", restorePath); document.removeEventListener("visibilitychange", updateClock);
       window.clearInterval(clock); window.history.scrollRestoration = scrollRestoration; requestNumber.current++;
-      if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
     };
-  }, [refresh]);
+  }, [refresh, preparePathChange]);
 
   const commitPath = useCallback((next: Panel[], index: number) => {
+    preparePathChange(next.length);
     setRestoringPath(false);
     panelsRef.current = next; activeRef.current = index;
     setPanels(next); setActive(index);
     window.history.pushState({...window.history.state, knowledgeReader: {active: index}}, "", readingUrl(next));
-  }, []);
+  }, [preparePathChange]);
 
   const navigate: Navigate = useCallback((target, from) => {
     if (from === undefined) {
@@ -575,19 +536,6 @@ function ReaderWorkspace() {
     if (!next.length) next.push({kind: "index"});
     commitPath(next, next.length - 1);
   }, [commitPath]);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {activate(activeRef.current); syncStackGeometry();});
-    return () => cancelAnimationFrame(frame);
-  }, [panels, model, focused, activate, syncStackGeometry]);
-
-  useEffect(() => {
-    const stack = stackRef.current;
-    if (!stack) return;
-    const observer = new ResizeObserver(() => {activate(activeRef.current); syncStackGeometry();});
-    observer.observe(stack);
-    return () => observer.disconnect();
-  }, [activate, syncStackGeometry]);
 
   useEffect(() => {if (model && panels[active]) document.title = panelTitle(panels[active], model) + " · 知识库";}, [model, panels, active]);
   useEffect(() => {
@@ -618,10 +566,7 @@ function ReaderWorkspace() {
     <main className="reader-main" id="reading-content">
       <ReadingHeader {...{panels, active, model, activate, navigate, font, changeSize, focused, setFocused, refreshing, error}} search={() => setSearchOpen(true)} size={fontSize} copy={() => void copyLink(active)} copied={copied === active} refresh={() => void refresh()} fetchedAt={snapshot?.fetched_at} help={() => setHelpOpen(true)}/>
       {error && <div className="error-banner" role="alert"><span>{error}</span><button onClick={() => void refresh()} disabled={refreshing}>重新连接</button></div>}
-      <div ref={stackRef} className="reading-stack" data-count={panels.length} data-focus={focused} onScroll={() => {
-        if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
-        scrollFrame.current = requestAnimationFrame(syncStackGeometry);
-      }}>
+      <div ref={stackRef} className="reading-stack" data-count={panels.length} data-focus={focused} onScroll={onStackScroll}>
         {!model ? <section className="initial-state">{refreshing ? <><h1>正在打开知识库…</h1><Skeleton className="loading-title"/><Skeleton/><Skeleton/><Skeleton className="loading-short"/></> : <EmptyState title="知识库暂时无法打开">请稍后重新连接。</EmptyState>}</section> : panels.map((panel, index) => {
           const viewKey = JSON.stringify(panels.slice(0, index + 1).map(panelKey));
           return <article key={viewKey} ref={element => {if (element) sheetRefs.current.set(index, element); else sheetRefs.current.delete(index);}} className="reading-sheet" data-active={index === active} data-stacked={stacked.includes(index)} aria-label={panelTitle(panel, model)} onPointerDown={() => {if (activeRef.current !== index) rememberActive(index);}} onFocusCapture={() => {if (activeRef.current !== index) rememberActive(index);}} style={{"--sheet-index": index} as CSSProperties}>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, type CSSProperties } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo, type ComponentPropsWithRef, type CSSProperties } from "react";
+import { ChevronRight } from "lucide-react";
+import { ReadingCollapse, ReadingCollapseContent, ReadingCollapseTrigger } from "../reading-motion";
 import { useReadingView } from "@/components/reading-view";
 import { useBulletReview } from "@/components/bullet-review-context";
 import { BulletCommentPin, useBulletAnnotation } from "../bullet-annotations";
@@ -9,10 +10,10 @@ import { BulletDiffContent } from "../bullet-diff";
 import { BulletBody, PageLink } from "./content";
 import { blockExpansionKey, buildPageBlocks, type BlockSurface, type KnowledgeModel, type Navigate, type PageBlock } from "./model";
 
-export function PageBlockList({blocks, surface, from, navigate, depth = 0}: {
+export function PageBlockList({blocks, surface, from, navigate, depth = 0, className = "", style, ...listProps}: {
   blocks: PageBlock[]; surface: BlockSurface; from: number; navigate: Navigate; depth?: number;
-}) {
-  return <ul className="page-block-list" style={{"--page-block-depth": depth} as CSSProperties}>{blocks.map(block =>
+} & ComponentPropsWithRef<"ul">) {
+  return <ul {...listProps} className={"page-block-list" + (className ? " " + className : "")} style={{...style, "--page-block-depth": depth} as CSSProperties}>{blocks.map(block =>
     <BlockRow key={(block.reviewSide || "after") + ":" + block.id} {...{block, surface, from, navigate, depth}}/>
   )}</ul>;
 }
@@ -28,15 +29,15 @@ function BlockRow({block, surface, from, navigate, depth}: {block: PageBlock; su
   const toggle = () => updateView(current => inBody
     ? {expanded: {...current.expanded, [stateKey]: !expanded}}
     : {details: {...current.details, [stateKey]: !expanded}});
-  return <li className="page-block" data-bullet-id={inBody && !block.reviewSide ? block.id : undefined}
+  return <ReadingCollapse open={expanded} onOpenChange={toggle} asChild><li className="page-block" data-bullet-id={inBody && !block.reviewSide ? block.id : undefined}
     data-before-bullet-id={block.reviewSide ? block.id : undefined}
     data-reference-bullet-id={!inBody ? block.id : undefined}
     data-located={inBody && view.focusedId === block.id || undefined}
     data-linked={nextPanel?.kind === "bullet" && nextPanel.id === block.id || undefined}>
     <div className="page-block-row" {...annotation}>
-      {hasChildren ? <button className="page-block-toggle" aria-expanded={expanded} onClick={toggle}
+      {hasChildren ? <ReadingCollapseTrigger><button className="page-block-toggle" aria-expanded={expanded}
         aria-label={(expanded ? "折叠下级：" : "展开下级：") + block.title}
-        title={expanded ? "折叠下级" : "展开下级"}>{expanded ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</button>
+        title={expanded ? "折叠下级" : "展开下级"}><ChevronRight aria-hidden="true"/></button></ReadingCollapseTrigger>
         : <span className="page-block-toggle-space" aria-hidden="true"/>}
       {block.available ? <PageLink target={{kind: "bullet", id: block.id}} {...{from, navigate}}
         appearance="bullet" label={"打开内容：" + block.title}
@@ -52,8 +53,8 @@ function BlockRow({block, surface, from, navigate, depth}: {block: PageBlock; su
       </div>
       {inBody && <BulletCommentPin id={block.id}/>}
     </div>
-    {hasChildren && expanded && <PageBlockList blocks={block.children} {...{surface, from, navigate}} depth={depth + 1}/>}
-  </li>;
+    {hasChildren && <ReadingCollapseContent open={expanded}><PageBlockList blocks={block.children} {...{surface, from, navigate}} depth={depth + 1}/></ReadingCollapseContent>}
+  </li></ReadingCollapse>;
 }
 
 export function PageBulletList({parentId, model, from, navigate}: {parentId: string; model: KnowledgeModel; from: number; navigate: Navigate}) {

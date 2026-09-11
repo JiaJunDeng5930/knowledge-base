@@ -1,4 +1,5 @@
 @import "./page-content/page-content.css";
+@import "./reading-motion/reading-motion.css";
 
 /*
  * 阅读呈现：字体、字号、行距、配色、布局、间距、图标、热区、焦点与响应式的唯一入口。
@@ -95,6 +96,16 @@
   --reader-page-shadow: -2px 0 5px #1c304909;
   --reader-popover-shadow: 0 8px 28px #1c30491a;
 
+  /* 动画时长与缓动集中配置；滚动时长为毫秒数，供 reading-motion/scroll.ts 读取。 */
+  --reader-motion-scroll-duration: 320;
+  --reader-motion-scroll-power: 4;
+  --reader-motion-fast: 120ms;
+  --reader-motion-fade: 150ms;
+  --reader-motion-expand: 200ms;
+  --reader-motion-ease: cubic-bezier(.19, 1, .22, 1);
+  --reader-motion-enter-distance: 12px;
+  --reader-motion-popover-distance: 4px;
+
   /* 现有组件库主题桥接，业务组件不再提供零散 Tailwind 视觉参数。 */
   --background: var(--reader-paper);
   --foreground: var(--reader-ink);
@@ -136,7 +147,6 @@ a { color: var(--reader-link); }
 a, button, input, summary { outline-offset: var(--reader-outline-offset); }
 :focus-visible { outline: var(--reader-outline-width) solid var(--reader-focus); }
 ::selection { background: var(--reader-selection); }
-button, [data-slot], [data-sonner-toast] { animation: none !important; transition: none !important; }
 svg { width: var(--reader-icon-size); height: var(--reader-icon-size); flex-shrink: 0; stroke-width: var(--reader-icon-stroke); }
 kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); color: var(--reader-muted); border: 1px solid var(--reader-line); padding: 0 var(--reader-space-1); border-radius: var(--reader-radius); font-weight: var(--reader-weight-regular); white-space: nowrap; }
 .mono { font-family: var(--reader-font-code); }
@@ -194,11 +204,11 @@ kbd { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); 
 .reading-stack[data-focus="true"] .reading-sheet[data-active="true"] { display: flex; position: relative; left: 0; flex-basis: min(100%, var(--reader-focus-width)); width: min(100%, var(--reader-focus-width)); border-left: 1px solid var(--reader-line); }
 .reading-stack[data-focus="true"] .sheet-spine { display: none !important; }
 .reading-stack[data-focus="true"] .reading-sheet > :not(.sheet-spine) { visibility: visible; }
-.sheet-spine { display: none; position: absolute; inset: 0 auto 0 0; width: var(--reader-spine-width); height: 100%; padding: var(--reader-space-3) var(--reader-space-1); align-items: center; gap: var(--reader-space-3); background: var(--reader-canvas); color: var(--reader-muted); writing-mode: vertical-rl; font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); text-align: left; overflow: hidden; border-right: 1px solid var(--reader-line); }
+.sheet-spine { display: flex; opacity: 0; visibility: hidden; pointer-events: none; position: absolute; inset: 0 auto 0 0; width: var(--reader-spine-width); height: 100%; padding: var(--reader-space-3) var(--reader-space-1); align-items: center; gap: var(--reader-space-3); background: var(--reader-canvas); color: var(--reader-muted); writing-mode: vertical-rl; font-size: var(--reader-font-ui); line-height: var(--reader-leading-ui); text-align: left; overflow: hidden; border-right: 1px solid var(--reader-line); }
 .sheet-spine > span:first-child { font-family: var(--reader-font-code); font-size: var(--reader-font-meta); writing-mode: horizontal-tb; }
 .sheet-spine > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: calc(100% - var(--reader-space-7)); }
 .sheet-spine:hover { color: var(--reader-link); background: var(--reader-selected); }
-.reading-sheet[data-stacked="true"] .sheet-spine { display: flex; }
+.reading-sheet[data-stacked="true"] .sheet-spine { opacity: 1; visibility: visible; pointer-events: auto; }
 .reading-sheet[data-stacked="true"] > :not(.sheet-spine) { visibility: hidden; }
 .sheet-actions { position: absolute; top: var(--reader-space-1); right: var(--reader-space-1); z-index: 5; }
 .sheet-scroll { overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--reader-scrollbar) transparent; scrollbar-gutter: stable; scroll-padding-top: var(--reader-scroll-inset); }

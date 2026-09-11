@@ -37,6 +37,7 @@ agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建�
 - node --test tests/knowledge-reader.test.mjs：检查阅读路径、搜索、模型关系、bigint、分页及失败语义。
 - node --test tests/rendered-html.test.mjs：执行构建后的 Worker，验证中文页面、深层地址和只读 HTTP 接口。
 - node --test tests/reading-content.test.mjs：渲染实际组件，验证完整正文、深层结构、缓存视图、搜索高亮与记忆关联；这不是浏览器交互测试。
+- node --test tests/reading-motion.test.mjs：使用可控帧时钟验证重复导航、手动接管、边界、卸载、减少动态效果和展开后定位；这是程序测试，不能代替浏览器动画验收。
 - node --test tests/bullet-review.test.mjs：验证累积 diff、移动原位置、多选批注、D1 实际 SQL 与清理重试语义。
 - node --test tests/*.test.mjs：构建后执行完整测试，包括生产 Worker 的批注登录与同源边界。
 - 原仓库 tools/test_bullet_review.py 生成独立 PostgreSQL schema 内的事务测试，使用 SQL 工具执行后回滚，覆盖草稿保存、提交冲突、临时 ID、结构、引用、标签与 FSRS 保护。
@@ -52,3 +53,5 @@ agent 使用原仓库 skills/knowledge-base/bullet-review/ 的 SQL 查询创建�
 metrics.ts 读取 CSS 的实际布局值，避免 JS 与 CSS 维护两套书脊尺寸或断点。use-reading-font.ts 管理本设备字号偏好，并使正文与浮层同步。icon-button.tsx 统一动作按钮的语义、名称和提示。业务组件只传递内容层级和页序；不再写字号、颜色、行高、间距或图标大小。第三方 components/ui 保持原样。
 
 批注与 diff 的程序实体、模块职责及源码入口见 [AGENTS.md](AGENTS.md)。
+
+阅读动画作为独立模块维护在 `components/reader-presentation/reading-motion/`，统一承载滚动、书页过渡、书脊反馈、正文与目录展开、浮层过渡和减少动态效果支持。业务组件通过 `index.ts` 的接口传递阅读状态并发起导航，时长与缓动沿用 `reader.css` 的公共参数。各程序实体与调用约定见 [阅读动画索引](AGENTS.md#阅读动画的程序实体)。

@@ -12,8 +12,3 @@ export function readingSpineOffset(stack: HTMLElement, index: number) {
   const style = getComputedStyle(stack);
   return Math.min(index, Number(style.getPropertyValue("--reader-spine-limit"))) * parseFloat(style.getPropertyValue("--reader-spine-width"));
 }
-
-export function scrollReadingTarget(scroll: HTMLElement, target: HTMLElement) {
-  const inset = parseFloat(getComputedStyle(scroll).scrollPaddingTop) || 0;
-  scroll.scrollTo({top: scroll.scrollTop + target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - inset, behavior: "instant"});
-}

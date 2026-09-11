@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Panel } from "@/lib/knowledge-types";
+import { cancelReadingScroll } from "@/components/reader-presentation/reading-motion";
 
 export type ReadingView = {
   scrollTop: number;
@@ -47,6 +48,7 @@ export function ReadingViewProvider({viewKey, cache, nextPanel, children, visibl
   useLayoutEffect(() => {
     const node = scrollRef.current;
     if (node && visible) node.scrollTop = cache.get(viewKey)?.scrollTop || 0;
+    return () => {if (node) cancelReadingScroll(node);};
   }, [cache, viewKey, visible]);
   return <ReadingContext.Provider value={{view, updateView, scrollRef, nextPanel}}>
     <div className="sheet-scroll" ref={scrollRef} tabIndex={-1} onScroll={event => {
