@@ -1,4 +1,0 @@
-interface:
-  display_name: "每日知识复习"
-  short_description: "根据到期 cue 开始情境复习，自动评分并将追问产生的新知识保存为草稿"
-  default_prompt: "使用 $review-knowledge，直接开始今天的知识库复习。"

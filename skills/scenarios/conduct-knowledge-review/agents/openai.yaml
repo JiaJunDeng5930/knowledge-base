@@ -1,0 +1,4 @@
+interface:
+  display_name: "知识复习对话"
+  short_description: "依据复习文件逐题提问，按回答补问与纠正，解答追问后等待继续"
+  default_prompt: "使用 $conduct-knowledge-review，根据我提供的复习文件开始复习。"

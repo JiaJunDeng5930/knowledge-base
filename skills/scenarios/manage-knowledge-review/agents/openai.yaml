@@ -1,0 +1,4 @@
+interface:
+  display_name: "异步知识复习"
+  short_description: "准备当天到期内容的复习文件，并在对话结束后自动评分和整理知识草稿"
+  default_prompt: "使用 $manage-knowledge-review，准备今天的复习材料；如果已提供复习对话，则处理结果。"
