@@ -26,7 +26,7 @@ from fsrs.state import State
 
 if TYPE_CHECKING:
     from torch import Tensor  # torch is optional; import only for type checking
-from typing_extensions import Self
+from typing import Self
 
 FSRS_DEFAULT_DECAY = 0.1542
 DEFAULT_PARAMETERS = (

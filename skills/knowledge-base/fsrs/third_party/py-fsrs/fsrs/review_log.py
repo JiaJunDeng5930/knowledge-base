@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TypedDict
 
-from typing_extensions import Self
+from typing import Self
 
 from fsrs.rating import Rating
 
