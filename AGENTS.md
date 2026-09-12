@@ -40,6 +40,7 @@
 | `tools/knowledge-viewer/` | 知识库查看器。`site/` 保存当前 ChatGPT Sites 网站的完整源码、构建配置和测试，并提供 bullet 草稿 diff 与 D1 批注；网站只读取 Supabase。阅读动画、批注与 diff 的独立程序实体见[网站架构索引](tools/knowledge-viewer/site/AGENTS.md)。`run`、`server.py` 与 `public/` 保留旧只读本地实现。 |
 | `skills/knowledge-base/` | 整个知识库的通用 skill 所在目录，以 `SKILL.md` 为入口；`fsrs/SKILL.md` 提供按需加载的 FSRS 数据知识，计算脚本位于 `fsrs/scripts/`；`bullet-review/SKILL.md` 规定预览、批注与确认后提交，其 schema 和 SQL 查询保存在同一模块。 |
 | `skills/scenarios/` | 各类认知活动的场景 skill 所在目录。每个场景使用独立子目录，并在自己的目录中保存该场景使用的知识库操作工具。 |
+| `prompts/` | 独立使用的项目指令。`conduct-knowledge-review.md` 用于 ChatGPT review 项目的知识复习对话。 |
 
 除非已有实现需要，不预先增加应用框架、通用注册框架或第二份 schema 表示。
 
