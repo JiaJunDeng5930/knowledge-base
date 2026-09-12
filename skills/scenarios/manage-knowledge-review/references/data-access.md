@@ -4,7 +4,7 @@
 
 本个人知识库的 Supabase 项目标识为 `bfjvqvedxctfyeqnufke`。仅在用户已授权访问该知识库且对应连接可用时，通过 `execute_sql` 工具访问，参数为 `project_id` 和 `query`；本文件中的项目标识不授予访问权限。用户在当前对话中指定其他知识库时，以其指定为准。
 
-本场景使用当前环境已安装的 `knowledge-base`、`fsrs` 和 `integrate-explained-knowledge` 技能，通过技能目录定位并读取实际文件。草稿模块 `bullet-review` 的规则和 SQL 模板从本知识库仓库 [JiaJunDeng5930/knowledge-base](https://github.com/JiaJunDeng5930/knowledge-base) 读取，优先使用当前检出，缺少时通过已连接的 GitHub 读取。以下是各模块的源路径：
+本场景使用当前环境已安装的 `knowledge-base`、`fsrs`、`integrate-explained-knowledge` 和 `bullet-review` 技能，通过技能目录定位并读取实际文件；有同名副本时使用用户安装的版本。草稿模块未独立安装时，可读取 `knowledge-base` 随附的 `bullet-review` 目录；仍缺少时，从本知识库仓库 [JiaJunDeng5930/knowledge-base](https://github.com/JiaJunDeng5930/knowledge-base) 的当前检出或已连接的 GitHub 读取其规则和 SQL 模板。以下是各模块的源路径：
 
 | 何时读取 | 路径与用途 |
 | --- | --- |
