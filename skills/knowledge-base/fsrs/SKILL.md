@@ -11,7 +11,7 @@ FSRS（Free Spaced Repetition Scheduler）根据带时间的复习评分估计�
 
 ## 持久化数据
 
-操作数据库前读取 [schema.sql](../schema.sql)。该文件是字段与约束的唯一权威定义。FSRS 数据由以下四个表共同保存：
+操作数据库前，从技能目录定位用户安装的 `knowledge-base` 并读取其中的 `schema.sql`；在项目检出中也可读取 [schema.sql](../schema.sql)。该文件是字段与约束的唯一权威定义。FSRS 数据由以下四个表共同保存：
 
 | 表 | 保存的内容 |
 | --- | --- |
@@ -143,4 +143,4 @@ agent 将输出 JSON 作为 `save-fsrs-review.sql` 的参数，交给数据库�
 
 优化命令返回新的配置。采用新配置时，agent 先执行 `create-scheduler-config.sql` 创建一条共享配置，再读取每个目标对象的当前快照与完整历史并交给 `reschedule` 重算。agent 将输出的 `card` 与新配置的 `scheduler_config_id` 交给 `save-fsrs-reschedule.sql`，使所有目标对象改用同一条配置。历史中的最新事件应与快照的最后复习时间一致；重算本身不产生一次新的复习事件。
 
-修改本模块时，先读取 [DECISIONS.md](../DECISIONS.md)。
+修改本模块时，先读取 `knowledge-base` 目录中的 `DECISIONS.md`；在项目检出中也可读取 [DECISIONS.md](../DECISIONS.md)。
