@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ComponentPropsWithRef, type CSSProperties } from "react";
+import { useMemo, type ComponentPropsWithRef } from "react";
 import { ChevronRight } from "lucide-react";
 import { ReadingCollapse, ReadingCollapseContent, ReadingCollapseTrigger } from "../reading-motion";
 import { useReadingView } from "@/components/reading-view";
@@ -10,15 +10,15 @@ import { BulletDiffContent } from "../bullet-diff";
 import { BulletBody, PageLink } from "./content";
 import { blockExpansionKey, buildPageBlocks, type BlockSurface, type KnowledgeModel, type Navigate, type PageBlock } from "./model";
 
-export function PageBlockList({blocks, surface, from, navigate, depth = 0, className = "", style, ...listProps}: {
-  blocks: PageBlock[]; surface: BlockSurface; from: number; navigate: Navigate; depth?: number;
+export function PageBlockList({blocks, surface, from, navigate, className = "", ...listProps}: {
+  blocks: PageBlock[]; surface: BlockSurface; from: number; navigate: Navigate;
 } & ComponentPropsWithRef<"ul">) {
-  return <ul {...listProps} className={"page-block-list" + (className ? " " + className : "")} style={{...style, "--page-block-depth": depth} as CSSProperties}>{blocks.map(block =>
-    <BlockRow key={(block.reviewSide || "after") + ":" + block.id} {...{block, surface, from, navigate, depth}}/>
+  return <ul {...listProps} className={"page-block-list" + (className ? " " + className : "")}>{blocks.map(block =>
+    <BlockRow key={(block.reviewSide || "after") + ":" + block.id} {...{block, surface, from, navigate}}/>
   )}</ul>;
 }
 
-function BlockRow({block, surface, from, navigate, depth}: {block: PageBlock; surface: BlockSurface; from: number; navigate: Navigate; depth: number}) {
+function BlockRow({block, surface, from, navigate}: {block: PageBlock; surface: BlockSurface; from: number; navigate: Navigate}) {
   const {view, updateView, nextPanel} = useReadingView();
   const inBody = surface.kind === "body";
   const annotation = useBulletAnnotation(block.id, inBody);
@@ -53,7 +53,7 @@ function BlockRow({block, surface, from, navigate, depth}: {block: PageBlock; su
       </div>
       {inBody && <BulletCommentPin id={block.id}/>}
     </div>
-    {hasChildren && <ReadingCollapseContent open={expanded}><PageBlockList blocks={block.children} {...{surface, from, navigate}} depth={depth + 1}/></ReadingCollapseContent>}
+    {hasChildren && <ReadingCollapseContent open={expanded}><PageBlockList blocks={block.children} {...{surface, from, navigate}}/></ReadingCollapseContent>}
   </li></ReadingCollapse>;
 }
 

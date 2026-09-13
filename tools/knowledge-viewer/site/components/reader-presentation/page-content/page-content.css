@@ -5,7 +5,6 @@
   --page-block-dot-size: .3125rem;
   --page-block-ring: .2rem;
   --page-block-indent: 1.25rem;
-  --page-block-indent-limit: 3;
   --page-block-gap: var(--reader-list-gap);
   --page-block-guide: var(--reader-line);
   --page-reference-gap: var(--reader-space-4);
@@ -55,11 +54,10 @@
 .page-block-heading + .prose-note { margin-top: var(--reader-list-gap); }
 .page-block-unavailable { margin: 0; color: var(--reader-muted); }
 .page-block > .page-block-list {
-  --page-block-indent-visible: clamp(0, calc(var(--page-block-indent-limit) - var(--page-block-depth) + 1), 1);
-  margin-inline-start: calc(var(--page-block-indent) * var(--page-block-indent-visible));
+  margin-inline-start: var(--page-block-indent);
   margin-block-start: var(--page-block-gap);
 }
-.page-block > .page-block-list::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: calc(var(--page-block-control) * 1.5 - var(--page-block-indent) * var(--page-block-indent-visible)); border-inline-start: 1px solid var(--page-block-guide); opacity: var(--page-block-indent-visible); pointer-events: none; }
+.page-block > .page-block-list::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: calc(var(--page-block-control) * 1.5 - var(--page-block-indent)); border-inline-start: 1px solid var(--page-block-guide); pointer-events: none; }
 .page-block[data-linked="true"] > .page-block-row { background: var(--reader-selected); }
 
 /* 内部链接的双括号是提示，链接文字仍保持连续的正文行距。 */
