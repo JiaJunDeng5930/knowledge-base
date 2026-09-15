@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { StatisticsViewState } from "@/features/statistics";
 import type { Panel } from "@/lib/knowledge-types";
 import { cancelReadingScroll } from "@/components/reader-presentation/reading-motion";
 
 export type ReadingView = {
+  statistics?: StatisticsViewState;
   scrollTop: number;
   expanded: Record<string, boolean>;
   raw: boolean;

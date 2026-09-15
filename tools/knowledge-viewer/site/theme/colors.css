@@ -1,0 +1,117 @@
+/* 全站配色的唯一入口。阅读、统计、批注、diff 与组件库共用语义颜色。 */
+:root {
+  --site-ink: #333333;
+  --site-muted: #687078;
+  --site-link: #166da9;
+  --site-paper: #ffffff;
+  --site-canvas: #f8f9fb;
+  --site-line: #e2e5e9;
+  --site-hover: #f0f3f6;
+  --site-selected: #e7f1f9;
+  --site-selection: #d5e9f9;
+  --site-focus: #1c70a8;
+  --site-scrollbar: #bdc5cd;
+  --site-code-surface: #f4f5f7;
+  --site-highlight: #fff1ba;
+  --site-highlight-strong: #f6d56e;
+  --site-highlight-ink: #705615;
+  --site-warning: #915434;
+  --site-warning-surface: #fff3ec;
+  --site-overlay: #18222d55;
+  --site-added: #42745a;
+  --site-added-surface: #f3f8f4;
+  --site-removed: #9a6464;
+  --site-removed-surface: #fcf5f4;
+  --site-moved: #8a806a;
+  --site-modified: #94702f;
+  --site-secondary-link: #387ba8;
+  --site-annotation-halo: #72b3e02e;
+  --site-annotation-halo-selected: #72b3e04d;
+  --site-annotation-border: #72b3e050;
+  --site-strikethrough: #9a646480;
+  --site-page-shadow: #1c304909;
+  --site-popover-shadow: #1c30491a;
+  --site-annotation-shadow: #24364a14;
+
+  /* 有序数据用同色明度，状态数据使用固定语义；图例同时保留文字或图形。 */
+  --site-heatmap-0: var(--site-hover);
+  --site-heatmap-1: #d5e7f4;
+  --site-heatmap-2: #97c3e0;
+  --site-heatmap-3: #559dcb;
+  --site-heatmap-4: var(--site-link);
+  --site-heatmap-pending-0: var(--site-heatmap-0);
+  --site-heatmap-pending-1: #d2d8de;
+  --site-heatmap-pending-2: var(--site-scrollbar);
+  --site-heatmap-pending-3: #939da6;
+  --site-heatmap-pending-4: var(--site-muted);
+  --site-fsrs-new: var(--site-scrollbar);
+  --site-fsrs-learning: var(--site-secondary-link);
+  --site-fsrs-review: var(--site-added);
+  --site-fsrs-relearning: var(--site-modified);
+  --site-rating-again: var(--site-removed);
+  --site-rating-hard: var(--site-modified);
+  --site-rating-good: var(--site-link);
+  --site-rating-easy: var(--site-added);
+
+  /* 现有阅读与批注的公开变量保持兼容，颜色只在本模块声明。 */
+  --reader-ink: var(--site-ink);
+  --reader-muted: var(--site-muted);
+  --reader-link: var(--site-link);
+  --reader-paper: var(--site-paper);
+  --reader-canvas: var(--site-canvas);
+  --reader-line: var(--site-line);
+  --reader-hover: var(--site-hover);
+  --reader-selected: var(--site-selected);
+  --reader-selection: var(--site-selection);
+  --reader-focus: var(--site-focus);
+  --reader-scrollbar: var(--site-scrollbar);
+  --reader-code-surface: var(--site-code-surface);
+  --reader-highlight: var(--site-highlight);
+  --reader-highlight-strong: var(--site-highlight-strong);
+  --reader-highlight-ink: var(--site-highlight-ink);
+  --reader-warning: var(--site-warning);
+  --reader-warning-surface: var(--site-warning-surface);
+  --reader-overlay: var(--site-overlay);
+  --diff-added: var(--site-added);
+  --diff-added-bg: var(--site-added-surface);
+  --diff-removed: var(--site-removed);
+  --diff-removed-bg: var(--site-removed-surface);
+  --diff-moved: var(--site-moved);
+  --diff-modified: var(--site-modified);
+  --diff-navigation-moved: var(--site-secondary-link);
+  --annotation-blue: var(--site-secondary-link);
+  --annotation-halo: var(--site-annotation-halo);
+  --annotation-halo-selected: var(--site-annotation-halo-selected);
+  --annotation-error: var(--site-removed);
+
+  /* 现有组件库主题桥接，业务组件不再提供零散 Tailwind 视觉参数。 */
+  --background: var(--site-paper);
+  --foreground: var(--site-ink);
+  --card: var(--site-paper);
+  --card-foreground: var(--site-ink);
+  --popover: var(--site-paper);
+  --popover-foreground: var(--site-ink);
+  --primary: var(--site-link);
+  --primary-foreground: var(--site-paper);
+  --secondary: var(--site-hover);
+  --secondary-foreground: var(--site-ink);
+  --muted: var(--site-canvas);
+  --muted-foreground: var(--site-muted);
+  --accent: var(--site-selected);
+  --accent-foreground: var(--site-link);
+  --destructive: var(--site-warning);
+  --border: var(--site-line);
+  --input: var(--site-line);
+  --ring: var(--site-focus);
+  --sidebar: var(--site-canvas);
+  --sidebar-foreground: var(--site-ink);
+  --sidebar-primary: var(--site-link);
+  --sidebar-primary-foreground: var(--site-paper);
+  --sidebar-accent: var(--site-selected);
+  --sidebar-accent-foreground: var(--site-link);
+  --sidebar-border: var(--site-line);
+  --sidebar-ring: var(--site-focus);
+}
+
+/* 组件库的独立浮层也遵守全站表面和遮罩配色。 */
+[data-slot="sheet-overlay"], [data-slot="dialog-overlay"] { background: var(--site-overlay); }

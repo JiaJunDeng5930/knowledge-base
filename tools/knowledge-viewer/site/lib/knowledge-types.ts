@@ -12,4 +12,4 @@ export type Snapshot = {
   fsrs_review: Review[];
   fetched_at: string;
 };
-export type Panel = {kind: "index"} | {kind: "all"} | {kind: "memory"} | {kind: "bullet"; id: string; focus?: string; highlight?: string} | {kind: "fsrs"; id: string} | {kind: "tag"; tag: string};
+export type Panel = {kind: "index"} | {kind: "all"} | {kind: "memory"} | {kind: "statistics"} | {kind: "bullet"; id: string; focus?: string; highlight?: string} | {kind: "fsrs"; id: string} | {kind: "tag"; tag: string};

@@ -1,11 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
+@import "../theme/colors.css";
 @import "../components/reader-presentation/reader.css";
 @import "../components/reader-presentation/bullet-diff.css";
 @import "../components/reader-presentation/bullet-annotations.css";
+@import "../features/statistics/statistics.css";
 
-/* 框架入口只保留工具和主题映射；阅读视觉统一在 reader-presentation。 */
+/* 框架入口只组合样式；全站颜色归 theme，阅读呈现归 reader-presentation。 */
 @utility scrollbar-thin { scrollbar-width: thin; }
 @utility scrollbar-none {
   scrollbar-width: none;

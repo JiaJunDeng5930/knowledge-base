@@ -1,18 +1,9 @@
 /* Bullet diff：正文保持原有排版，目录共享同一份差异状态。 */
-:root {
-  --diff-added: #42745a;
-  --diff-added-bg: #f3f8f4;
-  --diff-removed: #9a6464;
-  --diff-removed-bg: #fcf5f4;
-  --diff-moved: #8a806a;
-  --diff-modified: #94702f;
-  --diff-navigation-moved: #387ba8;
-}
 .bullet-diff-navigation { display:flex; align-items:center; gap:.5rem; min-width:0; }
 .bullet-diff-navigation-label { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bullet-diff-navigation[data-change="added"] { color:var(--diff-added); }
 .bullet-diff-navigation[data-change="deleted"] { color:var(--diff-removed); }
-.bullet-diff-navigation[data-change="deleted"] .bullet-diff-navigation-label { text-decoration:line-through; text-decoration-thickness:1px; text-decoration-color:#9a646480; }
+.bullet-diff-navigation[data-change="deleted"] .bullet-diff-navigation-label { text-decoration:line-through; text-decoration-thickness:1px; text-decoration-color:var(--site-strikethrough); }
 .bullet-diff-navigation[data-change="modified"], .bullet-diff-navigation[data-descendant-change] { color:var(--diff-modified); }
 .bullet-diff-navigation[data-change="moved"] { color:var(--diff-navigation-moved); }
 .bullet-diff-navigation-status, .bullet-diff-descendants { display:flex; align-items:center; justify-content:center; width:1rem; height:1rem; flex-shrink:0; }
@@ -28,7 +19,7 @@
 .bullet-diff-sign { position:absolute; left:calc(-1 * var(--page-block-control)); top:0; width:var(--page-block-control); color:var(--diff-added); font-family:var(--reader-font-code); font-size:.8em; line-height:calc(var(--reader-leading-body) / .8); text-align:center; user-select:none; pointer-events:none; }
 .bullet-diff-line--before .bullet-diff-sign { color:var(--diff-removed); }
 .bullet-diff-inline { margin:0; }
-.bullet-diff-inline del, .bullet-diff-metadata del { color:var(--diff-removed); text-decoration-thickness:1px; text-decoration-color:#9a646480; }
+.bullet-diff-inline del, .bullet-diff-metadata del { color:var(--diff-removed); text-decoration-thickness:1px; text-decoration-color:var(--site-strikethrough); }
 .bullet-diff-inline ins, .bullet-diff-metadata ins { color:var(--diff-added); text-decoration:none; }
 .bullet-diff-inline del { background:var(--diff-removed-bg); }
 .bullet-diff-inline ins { background:var(--diff-added-bg); }

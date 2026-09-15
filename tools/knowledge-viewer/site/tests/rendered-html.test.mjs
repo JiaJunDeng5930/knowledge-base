@@ -44,3 +44,18 @@ test('批注 API 要求登录，并拒绝从其他网站发起写入', async () 
   const crossSite = await worker.fetch(new Request('https://reader.example/api/bullet-review/comments',{method:'POST',headers:{'oai-authenticated-user-email':'test@example.test',origin:'https://elsewhere.example','content-type':'application/json'},body:'{}'}),bindings,context);
   assert.equal(crossSite.status,403);
 });
+
+test('统计历史 API 校验登录、禁止缓存，并拒绝全部写入方法', async () => {
+  const url = 'https://reader.example/api/statistics/history';
+  const unsigned = await worker.fetch(new Request(url), bindings, context);
+  assert.equal(unsigned.status, 401);
+  assert.equal(unsigned.headers.get('cache-control'), 'private, no-store');
+  const unconfigured = await worker.fetch(new Request(url, {headers: {'oai-authenticated-user-email': 'test@example.test'}}), bindings, context);
+  assert.equal(unconfigured.status, 503);
+  assert.deepEqual(await unconfigured.json(), {error: '知识变化记录尚未连接。'});
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']) {
+    const response = await worker.fetch(new Request(url, {method}), bindings, context);
+    assert.equal(response.status, 405, method);
+    assert.equal(response.headers.get('allow'), 'GET');
+  }
+});

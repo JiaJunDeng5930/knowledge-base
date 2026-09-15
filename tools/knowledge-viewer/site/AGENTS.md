@@ -2,7 +2,25 @@
 
 本目录同时维护于 Sites 源码仓库与 `JiaJunDeng5930/knowledge-base` 的 `tools/knowledge-viewer/site/`。修改时同步两处源码，复用 `.openai/hosting.json` 指定的网站并保持私有访问。
 
-保留完整知识浏览能力和连续阅读体验。视觉参数与交互呈现集中在 `components/reader-presentation/`；使用同一套字体、间距和图标规则。正文保持完整，操作按需出现，不添加逐条工具栏或冗余说明。
+保留完整知识浏览能力和连续阅读体验。全站配色集中在顶层 `theme/`；阅读的字体、间距、图标、布局与交互呈现集中在 `components/reader-presentation/`。正文保持完整，操作按需出现，不添加逐条工具栏或冗余说明。
+
+## 网站配色的程序实体
+
+`theme/colors.css` 是全站配色的唯一入口，由 `app/globals.css` 加载。`--site-*` 声明正文、表面、链接、状态、图表与透明阴影的语义颜色，同时桥接组件库变量和既有 `--reader-*`、`--diff-*`、`--annotation-*` 变量。业务组件与功能样式引用这些变量，不另建色板或散落颜色字面量。第三方组件保留原实现，由顶层语义变量控制当前站点表面。字体、尺寸与动画参数仍由各自呈现模块维护。
+
+## 统计的程序实体
+
+`features/statistics/` 独立负责整个知识库的统计；公共入口为 `index.ts`。阅读器提供正式 `Snapshot`、当前时刻、导航回调与阅读视图会话；统计模块拥有筛选、计算、图表和明细。FSRS 与 bullet 按多对多关系去重；草稿与网站批注不混入正式知识统计。
+
+| 程序实体 | 职责与源码入口 |
+| --- | --- |
+| `StatisticsPage`、`StatisticsViewState` | `statistics-page.tsx` 组合范围筛选、指标图表与共享明细；视图状态按阅读路径保存，明细链接继续现有阅读路径。全局统计入口只有一个。 |
+| 统计计算 | `statistics-model.ts` 统一自然日、范围继承、多对多计数、逐日知识历史、复习日历、保留率、FSRS 分布和到期安排。页面不复制计算规则。 |
+| 图表呈现 | `statistics-charts.tsx` 负责逐日折线、直方图、累计比例与 自然年热力图，包含指针和键盘选择；`statistics.css` 负责统计布局并引用全站配色。 |
+| 历史传输 | `statistics-history.ts` 定义仅含统计元数据的历史载荷、校验与固定 Supabase GET；`app/api/statistics/history/route.ts` 校验网站登录并保留错误语义。 |
+| 数据库历史投影 | `history.sql` 安装 `read_knowledge_statistics_history()`；先校验已有专用读取凭据，再把当前数据和审计记录投影成字符数、身份、父关系与标签。正文不通过此接口返回，不开放原始审计表。 |
+
+时间序列逐日呈现，不添加 7 / 30 / 90 天切换。每日复习固定显示所选自然年的 1 月 1 日至 12 月 31 日（闰年 366 天）；历史展示实际评分，今天同时显示完成记录和待复习对象，未来展示当前下一次到期，今天以前到期的对象单独汇总；空样本保留率留空，读取失败不伪装成零。详细统计口径与部署依赖见 `DESIGN.md`，计算与权限边界的验证见 `tests/statistics.test.mjs`。
 
 ## 阅读动画的程序实体
 

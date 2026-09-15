@@ -9,25 +9,28 @@
 - 整体风格与连续阅读交互参考 [Andy Matuschak 的笔记网站](https://notes.andymatuschak.org/)。页内 bullet list、links（引用与内部链接）、backlinks（反向引用）的呈现和交互提示参考 [Roam Research 公共帮助图谱](https://roamresearch.com/#/app/help)。
 - 同一位置避免放置功能和效果相同的多个按钮。动作优先通过图形、位置与状态表达，减少解释按钮用途的可见文字；仍须保留清楚的可访问名称、键盘焦点和必要的悬停提示。
 - 文字排版应紧凑、自然，统一设计行间距及段落、列表、标题之间的节奏。保留原文、代码和来源上下文，不以截断或重复摘要替代正文阅读。
-- 删除并避免重新加入“xx 条笔记”“xx 个记忆对象”“x 字符”等冗余统计。搜索匹配数量、当前阅读路径位置等直接帮助完成操作的信息可以保留。
+- 正文与目录避免重复展示笔记总数、记忆对象总数和字符数；数据库总量与 FSRS 分析集中于独立统计页。搜索匹配数量、当前阅读路径位置等直接帮助完成操作的信息可以保留。
 - bullet 变更以整体 diff 叠加在阅读界面，保留原文与最新草稿。用户可对一个或多个 bullet 留批注，通过对话要求 agent 修改；网站不提供正文编辑或正式提交按钮。草稿和批注不版本化。
 - 批注与 diff 优先维护连续阅读：右上角集中入口，操作热区贴合正文行，选择反馈沿用圆点；正常阅读不出现逐条工具栏。变化使用必要的符号与淡色表达，详细说明留在悬停提示与帮助中。
 
 ## 必须独立维护的架构部分
 
-所有影响阅读视觉体验的选择统一放在 `site/components/reader-presentation/`，包括字体、字号、行高、配色、布局、间距、缩进、图标、交互热区、焦点和响应式行为。公共主题变量集中声明；业务组件提供内容和状态，不在各处重复写视觉参数。JavaScript 需要实际字号或布局尺度时，从这套定义读取。
+全站配色统一声明在顶层 `site/theme/colors.css`，阅读、统计、批注、diff 与组件库共同引用语义颜色。阅读的字体、字号、行高、布局、间距、缩进、图标、交互热区、焦点和响应式行为统一放在 `site/components/reader-presentation/`；统计布局由 `site/features/statistics/` 负责。业务组件提供内容和状态，不在各处重复写视觉参数。JavaScript 需要实际字号或布局尺度时，从阅读呈现定义读取。
 
 页内 bullet list、links、backlinks 进一步集中在 `reader-presentation/page-content/`，同时统一呈现模型、渲染组件和样式。正文与两个方向的引用共用内容块；引用边仍保持方向，不混入父子层级。圆点独立打开块，三角只折叠下级，折叠状态由圆环提示。引用保留完整原文和可定位的来源路径；正文与不同引用实例的展开状态分别保存，引用中的重复原文不干扰正文搜索与定位。
 
 当用户要求把某个功能、概念或呈现方式作为源码中的专门部分实现时，必须在同一次修改中主动补充或更新本文件的索引，写明该部分的职责和实际源码入口，无须用户再次提醒。后续移动、重命名、重构或职责变化时，同步维护对应索引。
 
-阅读动画、批注和 diff 必须分别由独立模块承载，页面只组合组件及调用接口；[网站 AGENTS.md](site/AGENTS.md) 记录程序实体、依赖关系和各模块负责的规则。阅读动画的滚动目标、取消、书页位移、展开与退出过渡集中在 `reader-presentation/reading-motion/`，不得散回业务组件。
+阅读动画、批注、diff、知识库统计与全站配色必须分别由独立模块承载，页面只组合组件及调用接口；[网站 AGENTS.md](site/AGENTS.md) 记录程序实体、依赖关系和各模块负责的规则。阅读动画的滚动目标、取消、书页位移、展开与退出过渡集中在 `reader-presentation/reading-motion/`，不得散回业务组件。
 
 下表路径均相对于本文件所在目录。
 
 | 需求或职责 | 源码入口 |
 | --- | --- |
-| 阅读呈现的公共主题、字体、字号、行高、颜色、布局及响应式规则 | [reader.css](site/components/reader-presentation/reader.css) |
+| 全站语义配色及既有阅读、批注、diff 和组件库颜色映射 | [colors.css](site/theme/colors.css) |
+| 知识库统计：范围筛选、逐日变化、固定自然年复习热力图与未来到期、FSRS 分布和明细 | [statistics/index.ts](site/features/statistics/index.ts)；[统计设计](site/DESIGN.md#知识库统计与全站配色) |
+| 只读统计历史：受限审计投影与登录校验后的传输 | [history.sql](site/features/statistics/history.sql)、[statistics-history.ts](site/features/statistics/statistics-history.ts)、[统计历史 API](site/app/api/statistics/history/route.ts) |
+| 阅读的字体、字号、行高、布局及响应式规则 | [reader.css](site/components/reader-presentation/reader.css) |
 | 从 CSS 读取字号设置与书脊尺度 | [metrics.ts](site/components/reader-presentation/metrics.ts) |
 | 独立阅读动画模块：`useReadingStackMotion`、`scrollReadingTarget`、`ReadingCollapse`；统一滚动、书脊、书页过渡、内容展开与动画取消 | [reading-motion/index.ts](site/components/reader-presentation/reading-motion/index.ts)、[reading-motion/reading-motion.css](site/components/reader-presentation/reading-motion/reading-motion.css) |
 | 本设备字号偏好及正文、浮层之间的同步 | [use-reading-font.ts](site/components/reader-presentation/use-reading-font.ts) |
@@ -67,9 +70,10 @@ Supabase `bullet_draft` 只保存唯一草稿的固定 `base`、最新 `proposed
 | 项目标识的配置来源 | [site/.openai/hosting.json](site/.openai/hosting.json)；复用该项目 |
 | 本仓库的网站源码 | `tools/knowledge-viewer/site/` |
 | 运行与构建 | React / Vinext；Cloudflare Worker 与静态资源；见 [package.json](site/package.json)、[vite.config.ts](site/vite.config.ts) 和 [构建脚本](site/scripts/build-verified.sh) |
-| 数据连接配置 | 服务端运行时环境变量 `SUPABASE_URL`、`SUPABASE_KEY` 和仅用于草稿读取的 secret `SUPABASE_DRAFT_READ_KEY`；空模板见 [site/.env.example](site/.env.example) |
+| 数据连接配置 | 服务端运行时环境变量 `SUPABASE_URL`、`SUPABASE_KEY` 和用于草稿及统计历史受限读取的 secret `SUPABASE_DRAFT_READ_KEY`；空模板见 [site/.env.example](site/.env.example) |
 | 网站批注存储 | `.openai/hosting.json` 的 D1 binding `DB`；声明式 schema 为 `site/db/schema.ts`，迁移为 `site/drizzle/` |
 
 Sites 使用绑定的独立源码仓库发布，本 GitHub 仓库的 `site/` 保存同一份完整源码。GitHub 同步与 Sites 发布是两项独立操作；更新网站时保持二者的源码一致。
 
 发布沿用 Sites 技能的流程：构建并验证，将对应源码推送到该 Site 绑定的源码分支；推送成功后读取完整提交 SHA，用同一源码的构建产物保存版本，再执行私有发布并确认部署成功。版本、部署状态和临时源码凭据以 Sites 当前返回的信息为准。Supabase 密钥只放在服务端环境中，源码仓库不保存凭据、私有数据快照或构建产物。
+

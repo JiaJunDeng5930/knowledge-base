@@ -16,7 +16,7 @@ export function readingUrl(panels: Panel[]): string {
 export function readPanels(url: URL): Panel[] {
   const panels: Panel[] = [];
   for (const value of url.searchParams.getAll("p")) {
-    if (["index", "all", "memory"].includes(value)) panels.push({ kind: value as "index" | "all" | "memory" });
+    if (["index", "all", "memory", "statistics"].includes(value)) panels.push({ kind: value as "index" | "all" | "memory" | "statistics" });
     else if (/^b:-?\d+(?:@-?\d+)?(?:\?[\s\S]*)?$/.test(value)) {
       const match = value.match(/^b:(-?\d+)(?:@(-?\d+))?(?:\?([\s\S]*))?$/)!;
       panels.push({kind: "bullet", id: match[1], ...(match[2] ? {focus: match[2]} : {}), ...(match[3] ? {highlight: match[3]} : {})});
@@ -91,4 +91,9 @@ export function searchExcerpt(body: string, query: string, length = 150): string
   const matches = terms.map(term => text.toLowerCase().indexOf(term)).filter(n => n >= 0);
   const start = matches.length ? Math.max(0, Math.min(...matches) - 36) : 0;
   return (start ? "…" : "") + text.slice(start, start + length) + (text.length > start + length ? "…" : "");
+}
+
+// cue 的固定前缀不承担对象识别，列表与统计明细共用同一标题规则。
+export function memoryCueTitle(cue: string): string {
+  return bulletTitle(cue.replace(/^场景等价类(?:（[^）]*）)?[：:]\s*/, ""), 230);
 }

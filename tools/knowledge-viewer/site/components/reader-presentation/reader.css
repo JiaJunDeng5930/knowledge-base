@@ -30,25 +30,6 @@
   --reader-leading-code: 1.55;
   --reading-font-size: calc(var(--reader-font-selected, var(--reader-font-default)) * 1rem / 16);
 
-  /* 色彩只分正文、次要信息、链接、表面和状态，不为每个区域另配颜色。 */
-  --reader-ink: #333333;
-  --reader-muted: #687078;
-  --reader-link: #166da9;
-  --reader-paper: #ffffff;
-  --reader-canvas: #f8f9fb;
-  --reader-line: #e2e5e9;
-  --reader-hover: #f0f3f6;
-  --reader-selected: #e7f1f9;
-  --reader-selection: #d5e9f9;
-  --reader-focus: #1c70a8;
-  --reader-scrollbar: #bdc5cd;
-  --reader-code-surface: #f4f5f7;
-  --reader-highlight: #fff1ba;
-  --reader-highlight-strong: #f6d56e;
-  --reader-highlight-ink: #705615;
-  --reader-warning: #915434;
-  --reader-warning-surface: #fff3ec;
-  --reader-overlay: #18222d55;
 
   /* 空间节奏；正文中的段距与行距分开定义，嵌套列表不叠加整段空白。 */
   --reader-space-1: .25rem;
@@ -93,8 +74,8 @@
   --reader-outline-width: 2px;
   --reader-outline-offset: 3px;
   --reader-radius: .25rem;
-  --reader-page-shadow: -2px 0 5px #1c304909;
-  --reader-popover-shadow: 0 8px 28px #1c30491a;
+  --reader-page-shadow: -2px 0 5px var(--site-page-shadow);
+  --reader-popover-shadow: 0 8px 28px var(--site-popover-shadow);
 
   /* 动画时长与缓动集中配置；滚动时长为毫秒数，供 reading-motion/scroll.ts 读取。 */
   --reader-motion-scroll-duration: 320;
@@ -106,34 +87,7 @@
   --reader-motion-enter-distance: 12px;
   --reader-motion-popover-distance: 4px;
 
-  /* 现有组件库主题桥接，业务组件不再提供零散 Tailwind 视觉参数。 */
-  --background: var(--reader-paper);
-  --foreground: var(--reader-ink);
-  --card: var(--reader-paper);
-  --card-foreground: var(--reader-ink);
-  --popover: var(--reader-paper);
-  --popover-foreground: var(--reader-ink);
-  --primary: var(--reader-link);
-  --primary-foreground: var(--reader-paper);
-  --secondary: var(--reader-hover);
-  --secondary-foreground: var(--reader-ink);
-  --muted: var(--reader-canvas);
-  --muted-foreground: var(--reader-muted);
-  --accent: var(--reader-selected);
-  --accent-foreground: var(--reader-link);
-  --destructive: var(--reader-warning);
-  --border: var(--reader-line);
-  --input: var(--reader-line);
-  --ring: var(--reader-focus);
   --radius: var(--reader-radius);
-  --sidebar: var(--reader-canvas);
-  --sidebar-foreground: var(--reader-ink);
-  --sidebar-primary: var(--reader-link);
-  --sidebar-primary-foreground: var(--reader-paper);
-  --sidebar-accent: var(--reader-selected);
-  --sidebar-accent-foreground: var(--reader-link);
-  --sidebar-border: var(--reader-line);
-  --sidebar-ring: var(--reader-focus);
 }
 
 * { box-sizing: border-box; }

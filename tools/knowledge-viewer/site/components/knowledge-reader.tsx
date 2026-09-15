@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ArrowUpRight, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Clock3, Code2, Copy, FileText, Hash, List, Maximize2, Minimize2, PanelLeft, PanelLeftClose, RefreshCw, RotateCcw, Search, X, MapPin, AlignLeft, Minus, Plus, SlidersHorizontal, Delete } from "lucide-react";
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChartNoAxesCombined, ArrowUpRight, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Clock3, Code2, Copy, FileText, Hash, List, Maximize2, Minimize2, PanelLeft, PanelLeftClose, RefreshCw, RotateCcw, Search, X, MapPin, AlignLeft, Minus, Plus, SlidersHorizontal, Delete } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildKnowledgeModel } from "@/lib/knowledge-model";
-import { bulletTitle, followPanel, panelKey, readPanels, readingUrl, resultExcerpt, searchBullets, searchExcerpt, splitBulletContent } from "@/lib/reading-path";
+import { memoryCueTitle, bulletTitle, followPanel, panelKey, readPanels, readingUrl, resultExcerpt, searchBullets, searchExcerpt, splitBulletContent } from "@/lib/reading-path";
 import { ReadingDisclosure, ReadingViewProvider, useReadingView, type ReadingView } from "@/components/reading-view";
 import { BulletBody, InlineTitle } from "@/components/reader-presentation/page-content/content";
 import { PageBulletList } from "@/components/reader-presentation/page-content/block-list";
@@ -28,6 +28,8 @@ import { BulletReviewProvider, useBulletReview } from "@/components/bullet-revie
 import { BulletAnnotationControl, BulletCommentPin, useBulletAnnotation } from "@/components/reader-presentation/bullet-annotations";
 import { BulletDiffContent, BulletDiffMark, BulletDiffMenu, BulletDiffNavigationLabel } from "@/components/reader-presentation/bullet-diff";
 import { previewSnapshot } from "@/lib/bullet-review";
+
+const StatisticsPage = lazy(() => import("@/features/statistics").then(module => ({ default: module.StatisticsPage })));
 
 type Model = ReturnType<typeof buildKnowledgeModel>;
 const FSRS_STATES = {1: "学习中", 2: "复习中", 3: "重新学习"};
@@ -54,6 +56,7 @@ function panelTitle(panel: Panel, model: Model | null): string {
   if (panel.kind === "index") return "知识索引";
   if (panel.kind === "all") return "全部笔记";
   if (panel.kind === "memory") return "记忆与复习";
+  if (panel.kind === "statistics") return "知识库统计";
   if (panel.kind === "tag") return "#" + panel.tag;
   if (panel.kind === "fsrs") return "记忆对象 " + panel.id;
   const bullet = model?.bulletsById.get(panel.id);
@@ -129,8 +132,8 @@ function ReaderNavigation({model, panels, active, navigate}: {model: Model | nul
   </Sidebar>;
 }
 
-function ReadingHeader({panels, active, model, activate, navigate, search, font, size, changeSize, focused, setFocused, copy, copied, refresh, refreshing, fetchedAt, error, help}: {
-  panels: Panel[]; active: number; model: Model | null; activate: (index: number) => void; navigate: Navigate; search: () => void;
+function ReadingHeader({panels, active, model, activate, navigate, toggleStatistics, search, font, size, changeSize, focused, setFocused, copy, copied, refresh, refreshing, fetchedAt, error, help}: {
+  panels: Panel[]; active: number; model: Model | null; activate: (index: number) => void; navigate: Navigate; toggleStatistics: () => void; search: () => void;
   font: ReturnType<typeof readingFontSettings> | null; size: number | null; changeSize: (size: number) => void;
   focused: boolean; setFocused: (focused: boolean) => void; copy: () => void; copied: boolean;
   refresh: () => void; refreshing: boolean; fetchedAt?: string; error: string | null; help: () => void;
@@ -143,6 +146,7 @@ function ReadingHeader({panels, active, model, activate, navigate, search, font,
       <IconButton label={sidebarVisible ? "收起目录" : "展开目录"} aria-expanded={sidebarVisible} onClick={toggleSidebar}>{sidebarVisible ? <PanelLeftClose/> : <PanelLeft/>}</IconButton>
       <a className="reader-home" href={readingUrl([{kind: "index"}])} onClick={event => {if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return; event.preventDefault(); navigate({kind: "index"});}}>知识库</a>
       <div className="header-actions">
+        <IconButton label="知识库统计" aria-pressed={panels.some(panel => panel.kind === "statistics")} onClick={toggleStatistics}><ChartNoAxesCombined/></IconButton>
         {focused && <IconButton label="返回并排阅读" aria-pressed={true} onClick={() => setFocused(false)}><Minimize2/></IconButton>}
         <IconButton label="搜索知识库 · ⌘ / Ctrl K" onClick={search}><Search/></IconButton>
         <Popover><PopoverTrigger asChild><button className="icon-button" aria-label="阅读设置" title="阅读设置"><SlidersHorizontal/></button></PopoverTrigger><PopoverContent className="reading-preferences" align="end">
@@ -328,7 +332,7 @@ function BulletListPage({model, from, navigate, tag}: {model: Model; from: numbe
 function memoryTitle(fsrsId: string, model: Model): string {
   const memory: Fsrs | undefined = model.fsrsById.get(fsrsId);
   // 固定前缀不承担对象识别；完整 cue 仍在对象页原样呈现。
-  return memory?.cue ? bulletTitle(memory.cue.replace(/^场景等价类(?:（[^）]*）)?[：:]\s*/, ""), 230) : "记忆对象 #" + fsrsId;
+  return memory?.cue ? memoryCueTitle(memory.cue) : "记忆对象 #" + fsrsId;
 }
 
 function MemoryListPage({model, from, navigate, now}: {model: Model; from: number; navigate: Navigate; now: number}) {
@@ -441,6 +445,7 @@ function ReaderWorkspace() {
   const sidebarBeforeFocus = useRef(true);
   const panelsRef = useRef(panels);
   const activeRef = useRef(active);
+  const readingBeforeStatistics = useRef<{panels: Panel[]; active: number} | null>(null);
   const readingViews = useRef(new Map<string, ReadingView>());
   const requestNumber = useRef(0);
   const model = useMemo(() => snapshot ? buildKnowledgeModel(draft ? previewSnapshot(snapshot, draft) : snapshot) : null, [snapshot, draft]);
@@ -537,6 +542,18 @@ function ReaderWorkspace() {
     commitPath(next, next.length - 1);
   }, [commitPath]);
 
+  const toggleStatistics = useCallback(() => {
+    const index = panelsRef.current.findIndex(panel => panel.kind === "statistics");
+    if (index < 0) {
+      readingBeforeStatistics.current = {panels: panelsRef.current, active: activeRef.current};
+      navigate({kind: "statistics"});
+    } else if (index === 0 && readingBeforeStatistics.current) {
+      const previous = readingBeforeStatistics.current;
+      commitPath(previous.panels, previous.active);
+      setRestoringPath(true);
+    } else closePanel(index);
+  }, [navigate, commitPath, closePanel]);
+
   useEffect(() => {if (model && panels[active]) document.title = panelTitle(panels[active], model) + " · 知识库";}, [model, panels, active]);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -564,15 +581,16 @@ function ReaderWorkspace() {
     <a className="skip-link" href="#reading-content" onClick={event => {event.preventDefault(); sheetRefs.current.get(active)?.querySelector<HTMLElement>(".sheet-scroll")?.focus();}}>跳到阅读内容</a>
     <ReaderNavigation {...{model, panels, active, navigate}}/>
     <main className="reader-main" id="reading-content">
-      <ReadingHeader {...{panels, active, model, activate, navigate, font, changeSize, focused, setFocused, refreshing, error}} search={() => setSearchOpen(true)} size={fontSize} copy={() => void copyLink(active)} copied={copied === active} refresh={() => void refresh()} fetchedAt={snapshot?.fetched_at} help={() => setHelpOpen(true)}/>
+      <ReadingHeader {...{panels, active, model, activate, navigate, toggleStatistics, font, changeSize, focused, setFocused, refreshing, error}} search={() => setSearchOpen(true)} size={fontSize} copy={() => void copyLink(active)} copied={copied === active} refresh={() => void refresh()} fetchedAt={snapshot?.fetched_at} help={() => setHelpOpen(true)}/>
       {error && <div className="error-banner" role="alert"><span>{error}</span><button onClick={() => void refresh()} disabled={refreshing}>重新连接</button></div>}
       <div ref={stackRef} className="reading-stack" data-count={panels.length} data-focus={focused} onScroll={onStackScroll}>
         {!model ? <section className="initial-state">{refreshing ? <><h1>正在打开知识库…</h1><Skeleton className="loading-title"/><Skeleton/><Skeleton/><Skeleton className="loading-short"/></> : <EmptyState title="知识库暂时无法打开">请稍后重新连接。</EmptyState>}</section> : panels.map((panel, index) => {
           const viewKey = JSON.stringify(panels.slice(0, index + 1).map(panelKey));
-          return <article key={viewKey} ref={element => {if (element) sheetRefs.current.set(index, element); else sheetRefs.current.delete(index);}} className="reading-sheet" data-active={index === active} data-stacked={stacked.includes(index)} aria-label={panelTitle(panel, model)} onPointerDown={() => {if (activeRef.current !== index) rememberActive(index);}} onFocusCapture={() => {if (activeRef.current !== index) rememberActive(index);}} style={{"--sheet-index": index} as CSSProperties}>
+          return <article key={viewKey} ref={element => {if (element) sheetRefs.current.set(index, element); else sheetRefs.current.delete(index);}} className="reading-sheet" data-kind={panel.kind} data-active={index === active} data-stacked={stacked.includes(index)} aria-label={panelTitle(panel, model)} onPointerDown={() => {if (activeRef.current !== index) rememberActive(index);}} onFocusCapture={() => {if (activeRef.current !== index) rememberActive(index);}} style={{"--sheet-index": index} as CSSProperties}>
             <button className="sheet-spine" tabIndex={stacked.includes(index) ? 0 : -1} aria-hidden={!stacked.includes(index)} onClick={() => activate(index)} title={panelTitle(panel, model)}><span>{index + 1}</span><span>{panelTitle(panel, model)}</span></button>
             {index > 0 && <div className="sheet-actions"><IconButton label="收起此篇及后面的阅读分支" onClick={() => closePanel(index)}><X/></IconButton></div>}
             <ReadingViewProvider key={viewKey} viewKey={viewKey} cache={readingViews.current} nextPanel={panels[index + 1]} visible={!focused || index === active}>
+              {panel.kind === "statistics" && snapshot && <Suspense fallback={<div className="statistics-chart-empty" role="status">正在打开统计…</div>}><StatisticsPage snapshot={snapshot} {...{now, navigate}} from={index}/></Suspense>}
               {panel.kind === "index" && <IndexPage {...{model, navigate}} from={index}/>}
               {panel.kind === "bullet" && <BulletPage panel={panel} {...{model, navigate}} restorePosition={restoringPath && readingViews.current.has(viewKey)} from={index}/>}
               {(panel.kind === "all" || panel.kind === "tag") && <BulletListPage {...{model, navigate}} from={index} tag={panel.kind === "tag" ? panel.tag : undefined}/>}
